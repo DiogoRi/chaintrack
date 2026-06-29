@@ -13,6 +13,26 @@ PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 RPC_URL = os.getenv("RPC_URL")
+PINATA_JWT = os.getenv("PINATA_JWT")
+
+required_env_vars = {
+    "PRIVATE_KEY": PRIVATE_KEY,
+    "WALLET_ADDRESS": WALLET_ADDRESS,
+    "CONTRACT_ADDRESS": CONTRACT_ADDRESS,
+    "RPC_URL": RPC_URL,
+    "PINATA_JWT": PINATA_JWT,
+}
+
+missing_env_vars = [name for name, value in required_env_vars.items() if not value]
+
+if missing_env_vars:
+    st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
+    st.title("📡 DePIN Urbano")
+    st.error(
+        "Faltam variaveis de ambiente no arquivo .env: " + ", ".join(missing_env_vars)
+    )
+    st.info("Crie um .env na raiz do projeto com base em .env.example e preencha os valores.")
+    st.stop()
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
@@ -23,12 +43,18 @@ contract = w3.eth.contract(address=Web3.to_checksum_address(
     CONTRACT_ADDRESS), abi=CONTRACT_ABI)
 
 
-def registrar_blockchain(cid, descricao, endereco, latitude, longitude):
+def registrar_blockchain(cid, descricao, latitude, longitude):
+    """
+    Chama registrarOcorrencia(string _cid, string _descricao, string _lat, string _lng)
+    O contrato Ocorrencia.sol guarda lat/lng como STRING, entao convertemos com str().
+    Retorna o hash da transacao (sem o prefixo 0x; ele e adicionado na hora de montar o link).
+    """
     nonce = w3.eth.get_transaction_count(WALLET_ADDRESS)
-    tx = contract.functions.registrar(
-        cid, descricao, endereco,
-        int(latitude * 1_000_000),
-        int(longitude * 1_000_000)
+    tx = contract.functions.registrarOcorrencia(
+        cid,
+        descricao,
+        str(latitude),
+        str(longitude)
     ).build_transaction({
         "from": WALLET_ADDRESS,
         "nonce": nonce,
@@ -38,9 +64,6 @@ def registrar_blockchain(cid, descricao, endereco, latitude, longitude):
     signed_tx = w3.eth.account.sign_transaction(tx, PRIVATE_KEY)
     tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
     return tx_hash.hex()
-
-
-PINATA_JWT = os.getenv("PINATA_JWT")
 
 
 def upload_ipfs(arquivo):
@@ -91,7 +114,7 @@ if st.button("Enviar ocorrência"):
         with st.spinner("Enviando para o IPFS..."):
             cid = upload_ipfs(foto)
         if cid:
-            st.success(f"✅ Imagem salva no IPFS!")
+            st.success("✅ Imagem salva no IPFS!")
             st.code(f"CID: {cid}")
             latitude, longitude = geocode_endereco(
                 rua, numero, bairro, cidade, estado, cep)
@@ -99,14 +122,24 @@ if st.button("Enviar ocorrência"):
                 latitude, longitude = -23.5505, -46.6333
                 st.warning(
                     "Não foi possível localizar o endereço exato; usando localização padrão.")
+            else:
+                st.success("📍 Endereço localizado com precisão.")
 
             try:
-                tx_hash = registrar_blockchain(
-                    cid, descricao,
-                    f"{rua}, {numero} - {bairro}, {cidade} - {estado}, {cep}",
-                    latitude, longitude
-                )
-                st.success(f"✅ Registrado na blockchain! Tx: {tx_hash}")
+                with st.spinner("Registrando na blockchain..."):
+                    tx_hash = registrar_blockchain(
+                        cid, descricao, latitude, longitude)
+                    recibo = w3.eth.wait_for_transaction_receipt(
+                        tx_hash, timeout=120)
+
+                if recibo.status == 1:
+                    st.success("✅ Registrado na blockchain!")
+                    st.markdown(
+                        f"🔗 [Ver no PolygonScan](https://amoy.polygonscan.com/tx/0x{tx_hash})")
+                else:
+                    st.error(
+                        "❌ A transação foi minerada mas reverteu (status 0). "
+                        "O dado NÃO foi gravado on-chain. Confira o ABI e os tipos dos parâmetros.")
             except Exception as e:
                 st.warning(f"Falha ao registrar na blockchain: {e}")
 
