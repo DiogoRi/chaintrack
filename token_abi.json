@@ -15,6 +15,17 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "string", "name": "cid", "type": "string" },
+      { "indexed": true, "internalType": "address", "name": "destinatario", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "quantidade", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "name": "OcorrenciaConcluida",
+    "type": "event"
+  },
+  {
     "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
     "name": "balanceOf",
     "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
@@ -51,10 +62,11 @@
   },
   {
     "inputs": [
-      { "internalType": "address", "name": "to", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+      { "internalType": "string", "name": "cid", "type": "string" },
+      { "internalType": "address", "name": "destinatario", "type": "address" },
+      { "internalType": "uint256", "name": "quantidade", "type": "uint256" }
     ],
-    "name": "mint",
+    "name": "concluirOcorrencia",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

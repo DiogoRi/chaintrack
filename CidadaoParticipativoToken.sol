@@ -22,7 +22,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DePinToken is ERC20, Ownable {
+contract CidadaoParticipativoToken is ERC20, Ownable {
     /// @notice Emitido quando uma ocorrência é marcada como concluída.
     /// O `cid` é o mesmo identificador do IPFS usado no registro original
     /// da ocorrência — é o elo que liga essa conclusão à ocorrência certa.
@@ -33,7 +33,7 @@ contract DePinToken is ERC20, Ownable {
         uint256 timestamp
     );
 
-    constructor() ERC20("DePin Token", "DEPIN") Ownable(msg.sender) {}
+    constructor() ERC20("Cidadao Participativo", "CP") Ownable(msg.sender) {}
 
     /// @notice Registra na blockchain que a ocorrência identificada por
     /// `cid` foi concluída, e no mesmo instante envia `quantidade` tokens

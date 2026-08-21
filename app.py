@@ -125,8 +125,8 @@ descricao = st.text_area("Descreva o problema")
 
 st.markdown("### Recompensa (opcional)")
 wallet = st.text_input(
-    "Carteira Web3 (endereço, ex: 0xabc123...) — receba um token quando o "
-    "problema for resolvido",
+    "Carteira Web3 (endereço, ex: 0xabc123...) — receba tokens CP (Cidadão "
+    "Participativo) quando o problema for resolvido",
     help="Campo opcional. Se você não tiver ou não quiser informar, pode deixar em branco.",
 )
 

@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
 
 from antena_serial import enviar_sinal
-from mint_token import mint_para
+from mint_token import concluir_ocorrencia
 from tema_visual import aplicar_tema
 
 st.set_page_config(page_title="Dashboard DePIN", page_icon="🗺️", layout="wide")
@@ -98,8 +98,9 @@ if registros:
     st.markdown("### Ocorrências e status")
     st.caption(
         "Atualize o status manualmente conforme o andamento. Ao marcar como "
-        "**Concluída**, se a ocorrência tiver uma carteira informada, o "
-        "token DEPIN é enviado automaticamente e a antena recebe o sinal."
+        "**Concluída**, se a ocorrência tiver uma carteira informada, sai uma "
+        "transação na blockchain que registra a conclusão E envia o token "
+        "CP (Cidadão Participativo), tudo de uma vez — além de acionar o sinal da antena."
     )
 
     for i, r in enumerate(registros):
@@ -117,7 +118,7 @@ if registros:
                     f"https://gateway.pinata.cloud/ipfs/{r['cid']}", width=300)
             if r.get("token_tx"):
                 st.write(
-                    f"**Token enviado:** "
+                    f"**Conclusão + token on-chain:** "
                     f"[ver transação](https://amoy.polygonscan.com/tx/{r['token_tx']})"
                 )
 
@@ -134,34 +135,45 @@ if registros:
 
             if atualizar:
                 novo_status = LABEL_PARA_STATUS[label_escolhido]
-                if novo_status != status_atual:
+                mudou_status = novo_status != status_atual
+                # Se já está "concluída" mas a transação on-chain falhou antes
+                # (token_tx ainda vazio), o botão tenta de novo mesmo sem
+                # mudar o status — é o "tentar de novo" prometido no erro.
+                precisa_tentar_onchain = (
+                    novo_status == "concluida" and not r.get("token_tx")
+                )
+
+                if not mudou_status and not precisa_tentar_onchain:
+                    st.info("Esse já é o status atual.")
+                else:
                     r["status"] = novo_status
 
-                    if novo_status == "concluida" and not r.get("token_tx"):
+                    if precisa_tentar_onchain:
                         if r.get("wallet"):
                             try:
-                                tx = mint_para(r["wallet"])
+                                tx = concluir_ocorrencia(r["cid"], r["wallet"])
                                 r["token_tx"] = tx
                                 st.success(
-                                    f"✅ Token DEPIN enviado! Tx: {tx}")
+                                    f"✅ Conclusão registrada na blockchain e token CP enviado! "
+                                    f"Tx: {tx}"
+                                )
                             except Exception as e:
                                 st.error(
-                                    f"⚠️ Falha ao enviar o token automaticamente: {e}. "
+                                    f"⚠️ Falha ao registrar a conclusão on-chain: {e}. "
                                     f"Status salvo como concluída mesmo assim; "
-                                    f"pode tentar o mint de novo depois."
+                                    f"clique em Atualizar de novo (com Concluída "
+                                    f"selecionada) para tentar mais uma vez."
                                 )
                         else:
                             st.warning(
                                 "Ocorrência concluída, mas sem carteira informada — "
-                                "nenhum token foi enviado."
+                                "nenhuma transação de conclusão foi enviada."
                             )
                         # Sinaliza a antena (não trava se ela não estiver conectada)
                         enviar_sinal("CONCLUIDA")
 
                     salvar_registros(registros)
                     st.rerun()
-                else:
-                    st.info("Esse já é o status atual.")
 else:
     st.warning(
         "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")

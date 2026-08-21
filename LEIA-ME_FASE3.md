@@ -25,7 +25,7 @@ O que mudou em relação à Fase 2:
 
 1. **Antena de verdade (ESP32 + LED via USB serial)** — quando alguém registra uma ocorrência, o app manda um sinal pela porta serial e o LED da antena acende. Quando uma ocorrência é marcada como concluída, um segundo LED acende.
 2. **Status manual no dashboard** — cada ocorrência agora tem um status: Recebida → Em andamento → Concluída, alterado manualmente no painel do dashboard.
-3. **Token "infinito" (DEPIN)** — ao marcar uma ocorrência como Concluída, se ela tiver uma carteira associada, o sistema minta e envia automaticamente tokens DEPIN pra essa carteira, na Polygon Amoy.
+3. **Token "infinito" (CP — Cidadão Participativo)** — ao marcar uma ocorrência como Concluída, se ela tiver uma carteira associada, o sistema minta e envia automaticamente tokens CP pra essa carteira, na Polygon Amoy.
 4. **Campo de carteira no formulário** — o cidadão pode (opcionalmente) colar o endereço da sua wallet ao registrar, pra receber o token depois.
 
 ## Lista de compras (hardware) — comprar HOJE se possível
@@ -64,17 +64,36 @@ Veja os comentários no topo de `arduino/antena_depin.ino` — resumindo:
    ```
    Deve aparecer "Antena respondeu: 'ANTENA_PRONTA'" e o LED_REGISTRO piscar 3x.
 
-## Deploy do token DEPIN (uma vez só)
+## Deploy do token CP — Cidadão Participativo (uma vez só)
 
-1. Abra [remix.ethereum.org](https://remix.ethereum.org), crie um arquivo novo e cole o conteúdo de `DePinToken.sol`.
+1. Abra [remix.ethereum.org](https://remix.ethereum.org), crie um arquivo novo e cole o conteúdo de `CidadaoParticipativoToken.sol`.
 2. Compile (o Remix busca o OpenZeppelin sozinho pelo import).
 3. Na aba "Deploy & Run", conecte a MetaMask na rede **Polygon Amoy** (mesma carteira que já é dona do contrato de registro da Fase 2) e faça o deploy.
 4. Copie o endereço do contrato deployado e cole em `TOKEN_CONTRACT_ADDRESS` no `.env`.
-5. Teste o mint manualmente antes da apresentação:
+5. Teste a conclusão + mint manualmente antes da apresentação:
    ```
-   python mint_token.py 0xSEU_ENDERECO_DE_TESTE
+   python mint_token.py QmCIDdeTeste123 0xSEU_ENDERECO_DE_TESTE
    ```
-   Deve imprimir o hash da transação e um link do Polygonscan. Confira lá se o saldo do token realmente chegou na carteira de teste.
+   (o primeiro argumento pode ser qualquer texto de teste — na demo de verdade, o dashboard passa o CID real da ocorrência).
+   Deve imprimir o hash da transação e um link do Polygonscan. Confira lá se o evento `OcorrenciaConcluida` e o saldo do token realmente chegaram na carteira de teste.
+
+## Testando o fluxo completo sem a antena
+
+Isso é 100% possível e não depende de nenhum hardware — o Raphael pode testar
+a ESP32 depois, em paralelo:
+
+1. Rode `streamlit run app.py`, preencha o formulário (foto, nome, endereço,
+   descrição) e cole um endereço de carteira de teste no campo de carteira.
+2. Envie — o registro aparece na blockchain (prova original da ocorrência)
+   e cai no `registros.json` com status "Recebida".
+3. Rode `streamlit run dashboard.py`, abra essa ocorrência, mude o status pra
+   "Em andamento" (fica só local, não gera transação — a ideia é que a prova
+   de existência já saiu no passo 2).
+4. Mude para "Concluída" — isso dispara a transação `concluirOcorrencia` de
+   verdade na Polygon Amoy (se o `TOKEN_CONTRACT_ADDRESS` já estiver
+   configurado), aparecendo o link pro Polygonscan mostrando a conclusão
+   e o token enviado juntos. Sem antena nenhuma conectada, o app só avisa
+   que o sinal físico não foi enviado — o resto funciona normalmente.
 
 ## Rodando tudo
 
@@ -89,7 +108,7 @@ streamlit run dashboard.py --server.port 8502   # dashboard/admin
 ## Checklist antes do dia 28
 
 - [ ] Arduino gravado com o sketch e testado (`python antena_serial.py` responde)
-- [ ] Token DEPIN deployado e mint testado manualmente
+- [ ] Token CP deployado e mint testado manualmente
 - [ ] `.env` preenchido em todas as variáveis (Fase 2 + Fase 3)
 - [ ] Pelo menos 1 registro de teste enviado pelo app.py com carteira preenchida
 - [ ] Esse registro marcado como "Concluída" no dashboard e o token confirmado no Polygonscan
