@@ -10,6 +10,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from antena_serial import enviar_sinal
+from tema_visual import aplicar_tema
 
 load_dotenv()
 
@@ -31,6 +32,7 @@ missing_env_vars = [name for name, value in required_env_vars.items() if not val
 
 if missing_env_vars:
     st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
+    aplicar_tema()
     st.title("📡 DePIN Urbano")
     st.error(
         "Faltam variaveis de ambiente no arquivo .env: " + ", ".join(missing_env_vars)
@@ -100,6 +102,7 @@ def wallet_valida(endereco: str) -> bool:
 
 
 st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
+aplicar_tema()
 st.title("📡 DePIN Urbano")
 st.subheader("Registre um problema na sua cidade")
 

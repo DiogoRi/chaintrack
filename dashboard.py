@@ -6,8 +6,10 @@ from streamlit_autorefresh import st_autorefresh
 
 from antena_serial import enviar_sinal
 from mint_token import mint_para
+from tema_visual import aplicar_tema
 
 st.set_page_config(page_title="Dashboard DePIN", page_icon="🗺️", layout="wide")
+aplicar_tema()
 
 # ===== Auto-refresh =====
 # Intervalo em milissegundos. 2000 = 2 segundos.
