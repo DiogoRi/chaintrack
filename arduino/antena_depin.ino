@@ -2,25 +2,41 @@
   antena_depin.ino
   DePIN Urbano — Future Makers FIAP — Fase 3
 
-  Roda no Arduino (Uno/Nano/compatível) e recebe comandos via USB serial
-  vindos do notebook (enviados por antena_serial.py). Acende/pisca LEDs
-  que representam a antena/nó da rede reagindo em tempo real.
+  Roda na placa ESP32 e recebe comandos via USB serial vindos do notebook
+  (enviados por antena_serial.py, em Python). Acende/pisca LEDs que
+  representam a antena/nó da rede reagindo em tempo real.
+
+  IMPORTANTE (placa é ESP32, não Arduino Uno): usamos os pinos GPIO2 e
+  GPIO4, que são seguros de usar como saída na maioria das placas ESP32
+  Dev Module. Evite usar os pinos GPIO6 a GPIO11 — no ESP32 eles costumam
+  estar ligados internamente à memória flash e não devem ser usados como
+  E/S. O GPIO2, inclusive, já é o LED azul embutido em muitas placas ESP32
+  — então mesmo sem LED externo ligado, dá pra ver o "REGISTRO" piscando
+  nesse LED da própria placa.
+
+  No Arduino IDE, configure a placa como "ESP32 Dev Module" (Boards
+  Manager → procure "esp32" → instalar o pacote da Espressif; se ainda
+  não tiver o link, adicione em File > Preferences > Additional Board
+  Manager URLs:
+  https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json)
 
   Comandos aceitos (uma linha terminada em \n):
     REGISTRO   -> pisca o LED_REGISTRO 3x e deixa aceso (ocorrência recebida)
     CONCLUIDA  -> acende o LED_CONCLUIDA (ocorrência concluída + token enviado)
     RESET      -> apaga os dois LEDs (usar entre uma demo e outra)
 
-  Ligação (se só tiver 1 LED disponível, ligue só o LED_REGISTRO e ignore
-  o comando CONCLUIDA — ele simplesmente não vai fazer nada, sem causar erro):
-    Pino 8  -> resistor 220-330 ohm -> perna longa (anodo) do LED -> perna
-               curta (catodo) no GND         [LED_REGISTRO]
-    Pino 9  -> resistor 220-330 ohm -> perna longa (anodo) do LED -> perna
-               curta (catodo) no GND         [LED_CONCLUIDA]
+  Ligação (se só tiver 1 LED externo disponível, ligue só o LED_REGISTRO
+  e ignore o comando CONCLUIDA — ele simplesmente não vai fazer nada, sem
+  causar erro; o GPIO2 já pisca sozinho no LED embutido da placa mesmo
+  sem nada ligado):
+    GPIO2 -> resistor 220-330 ohm -> perna longa (anodo) do LED -> perna
+             curta (catodo) no GND         [LED_REGISTRO]
+    GPIO4 -> resistor 220-330 ohm -> perna longa (anodo) do LED -> perna
+             curta (catodo) no GND         [LED_CONCLUIDA]
 */
 
-const int LED_REGISTRO = 8;
-const int LED_CONCLUIDA = 9;
+const int LED_REGISTRO = 2;
+const int LED_CONCLUIDA = 4;
 
 void piscar(int pino, int vezes, int duracaoMs) {
   for (int i = 0; i < vezes; i++) {

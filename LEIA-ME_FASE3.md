@@ -10,44 +10,55 @@
 > foi preservado aqui. Também reparei que `streamlit-autorefresh` era usado
 > no dashboard mas nunca tinha entrado no `requirements.txt`; já corrigi.
 > **Use os arquivos desta entrega, não os da mensagem anterior.**
+>
+> **Atualização 21/08:** o Raphael confirmou que a placa é uma **ESP32**
+> (não um Arduino Uno). Já corrigi o `arduino/antena_depin.ino` pra usar
+> pinos seguros de ESP32 (GPIO2 e GPIO4 — evite GPIO6 a GPIO11, que no
+> ESP32 costumam estar ligados à memória flash). A comunicação continua
+> sendo por **cabo USB** (a mesma ideia de antes) — o Wi-Fi de 2.4GHz da
+> placa é um recurso a mais que ela tem, mas **não precisamos usar agora**;
+> ligar por USB é mais simples e mais confiável pra demonstração ao vivo.
+> Se sobrar tempo depois da Fase 3, dá pra evoluir pra usar o Wi-Fi, mas
+> isso fica de bônus, fora do caminho crítico desta semana.
 
 O que mudou em relação à Fase 2:
 
-1. **Antena de verdade (Arduino + LED via USB serial)** — quando alguém registra uma ocorrência, o app manda um sinal pela porta serial e o LED da antena acende. Quando uma ocorrência é marcada como concluída, um segundo LED acende.
+1. **Antena de verdade (ESP32 + LED via USB serial)** — quando alguém registra uma ocorrência, o app manda um sinal pela porta serial e o LED da antena acende. Quando uma ocorrência é marcada como concluída, um segundo LED acende.
 2. **Status manual no dashboard** — cada ocorrência agora tem um status: Recebida → Em andamento → Concluída, alterado manualmente no painel do dashboard.
 3. **Token "infinito" (DEPIN)** — ao marcar uma ocorrência como Concluída, se ela tiver uma carteira associada, o sistema minta e envia automaticamente tokens DEPIN pra essa carteira, na Polygon Amoy.
 4. **Campo de carteira no formulário** — o cidadão pode (opcionalmente) colar o endereço da sua wallet ao registrar, pra receber o token depois.
 
 ## Lista de compras (hardware) — comprar HOJE se possível
 
-Como faltam poucos dias, prefira uma loja física de eletrônica (ex: Santa Efigênia em SP) a comprar online, pra garantir que chega a tempo.
+A placa ESP32 (o Raphael já tem) dispensa o item "Arduino Uno" abaixo. Como faltam poucos dias, prefira uma loja física de eletrônica (ex: Santa Efigênia em SP) a comprar online, pra garantir que chega a tempo — só se faltar algum item da lista.
 
-- 1x Arduino Uno R3 (ou clone tipo "Uno compatível") — já vem com cabo USB na maioria dos kits, confirme antes de comprar
-- 2x LED (qualquer cor, sugestão: 1 vermelho + 1 verde ou azul)
-- 2x resistor de 220Ω a 330Ω (para proteger os LEDs)
+- ~~1x Arduino Uno R3~~ — não precisa, já tem a ESP32
+- 2x LED (qualquer cor, sugestão: 1 vermelho + 1 verde ou azul) — opcional: o GPIO2 já aciona o LED embutido da própria placa, então dá pra testar sem LED externo nenhum
+- 2x resistor de 220Ω a 330Ω (para proteger os LEDs, se forem usar externos)
 - 1x protoboard pequena (breadboard)
 - ~6 jumpers macho-macho
-- Se o Arduino não vier com cabo: 1x cabo USB-A para USB-B
+- 1x cabo USB compatível com a entrada da ESP32 (costuma ser micro-USB ou USB-C, dependendo do modelo)
 
-Se só der pra conseguir 1 LED, sem problema — o sistema funciona com só o LED de "registro recebido" (o segundo, de "concluída", simplesmente fica sem efeito até vocês conseguirem o segundo LED).
+Se só der pra usar o LED embutido da placa (sem LED externo), sem problema — o sistema funciona só com ele piscando pra "registro recebido"; o "concluída" (GPIO4) simplesmente fica sem efeito visível até ligarem um LED externo nesse pino.
 
-## Como ligar o Arduino
+## Como ligar a ESP32
 
 Veja os comentários no topo de `arduino/antena_depin.ino` — resumindo:
 
-- Pino 8 → resistor → LED (perna longa) → LED (perna curta) → GND — **LED_REGISTRO**
-- Pino 9 → resistor → LED (perna longa) → LED (perna curta) → GND — **LED_CONCLUIDA**
+- GPIO2 → resistor → LED (perna longa) → LED (perna curta) → GND — **LED_REGISTRO** (esse pino já é o LED azul embutido em muitas placas ESP32 — funciona mesmo sem nada ligado)
+- GPIO4 → resistor → LED (perna longa) → LED (perna curta) → GND — **LED_CONCLUIDA**
 
 ## Passo a passo para configurar
 
-1. Abra `arduino/antena_depin.ino` na Arduino IDE, selecione a placa e a porta certa, e grave (upload) no Arduino.
-2. Descubra o nome da porta serial:
+1. No Arduino IDE, instale o suporte a ESP32 (só na primeira vez): **File → Preferences → Additional Board Manager URLs**, cole `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`, depois vá em **Tools → Board → Boards Manager**, procure "esp32" e instale o pacote da Espressif.
+2. Abra `arduino/antena_depin.ino`, em **Tools → Board** selecione **"ESP32 Dev Module"** (ou o nome exato da variante da placa do Raphael, se aparecer uma mais específica), selecione a porta certa, e grave (upload).
+3. Descubra o nome da porta serial:
    - Windows: Gerenciador de Dispositivos → Portas (COM e LPT) → algo como "COM3"
-   - Mac: no Terminal, rode `ls /dev/cu.*` com o Arduino plugado
-   - Linux: rode `ls /dev/tty*` com o Arduino plugado (geralmente `/dev/ttyUSB0` ou `/dev/ttyACM0`)
-3. Copie `.env.example` para `.env` e preencha `SERIAL_PORT` com o valor encontrado, além das variáveis que já existiam da Fase 2.
-4. Instale as dependências novas: `pip install -r requirements.txt` (inclui `pyserial` agora).
-5. Teste a antena isoladamente, sem precisar do Streamlit:
+   - Mac: no Terminal, rode `ls /dev/cu.*` com a ESP32 plugada
+   - Linux: rode `ls /dev/tty*` com a ESP32 plugada (geralmente `/dev/ttyUSB0`)
+4. Copie `.env.example` para `.env` e preencha `SERIAL_PORT` com o valor encontrado, além das variáveis que já existiam da Fase 2.
+5. Instale as dependências novas: `pip install -r requirements.txt` (inclui `pyserial` agora).
+6. Teste a antena isoladamente, sem precisar do Streamlit:
    ```
    python antena_serial.py
    ```
