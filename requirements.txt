@@ -4,3 +4,5 @@ python-dotenv
 web3
 folium
 streamlit-folium
+streamlit-autorefresh
+pyserial

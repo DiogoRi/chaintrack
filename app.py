@@ -1,11 +1,15 @@
 import streamlit as st
 import json
 import os
+import re
+import uuid
 from web3 import Web3
 
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+
+from antena_serial import enviar_sinal
 
 load_dotenv()
 
@@ -88,6 +92,13 @@ def geocode_endereco(rua, numero, bairro, cidade, estado, cep):
     return None, None
 
 
+WALLET_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
+
+
+def wallet_valida(endereco: str) -> bool:
+    return bool(WALLET_REGEX.match(endereco.strip()))
+
+
 st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
 st.title("📡 DePIN Urbano")
 st.subheader("Registre um problema na sua cidade")
@@ -109,8 +120,25 @@ cep = st.text_input("CEP")
 st.markdown("### O que está acontecendo?")
 descricao = st.text_area("Descreva o problema")
 
+st.markdown("### Recompensa (opcional)")
+wallet = st.text_input(
+    "Carteira Web3 (endereço, ex: 0xabc123...) — receba um token quando o "
+    "problema for resolvido",
+    help="Campo opcional. Se você não tiver ou não quiser informar, pode deixar em branco.",
+)
+
 if st.button("Enviar ocorrência"):
-    if foto and descricao and nome and rua and cidade:
+    wallet_limpa = wallet.strip()
+    wallet_ok = True
+    if wallet_limpa and not wallet_valida(wallet_limpa):
+        wallet_ok = False
+        st.error(
+            "O endereço de carteira informado não parece válido "
+            "(precisa começar com '0x' e ter 42 caracteres). "
+            "Corrija ou deixe o campo em branco."
+        )
+
+    if foto and descricao and nome and rua and cidade and wallet_ok:
         with st.spinner("Enviando para o IPFS..."):
             cid = upload_ipfs(foto)
         if cid:
@@ -143,20 +171,32 @@ if st.button("Enviar ocorrência"):
             except Exception as e:
                 st.warning(f"Falha ao registrar na blockchain: {e}")
 
+            # Sinaliza a antena física (nunca trava o app se ela não responder)
+            antena_ok = enviar_sinal("REGISTRO")
+            if antena_ok:
+                st.info("📡 Antena acionada — nó da rede recebeu o sinal.")
+            else:
+                st.info(
+                    "📡 Antena não respondeu (ok para testar sem hardware conectado).")
+
             registro = {
+                "id": uuid.uuid4().hex[:8],
                 "nome": nome,
                 "endereco": f"{rua}, {numero} - {bairro}, {cidade} - {estado}, {cep}",
                 "descricao": descricao,
                 "latitude": latitude,
                 "longitude": longitude,
                 "cid": cid,
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "status": "recebida",
+                "wallet": wallet_limpa,
+                "token_tx": "",
             }
             with open("registros.json", "a") as f:
                 f.write(json.dumps(registro) + "\n")
             st.balloons()
         else:
             st.error("Erro ao enviar para o IPFS. Verifique a chave.")
-    else:
+    elif wallet_ok:
         st.warning(
             "Por favor, preencha nome, endereço, descrição e adicione a foto.")
