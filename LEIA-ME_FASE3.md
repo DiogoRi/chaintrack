@@ -1,15 +1,35 @@
 # DePIN Urbano — Fase 3 (Apresentação Presencial, 28/08)
 
-> **Nota de correção:** a primeira versão desses arquivos foi montada em cima de
-> uma cópia desatualizada de `app.py`/`dashboard.py`/`abi.json` que você tinha
-> me mandado antes. Comparei com o repositório real
-> (`github.com/DiogoRi/chaintrack`) e corrigi: o contrato de verdade usa
-> `registrarOcorrencia(cid, descricao, lat, lng)` (lat/lng como string, sem
-> campo de endereço no contrato), e o `dashboard.py` de vocês já tinha
-> auto-refresh de 2s e ajuste automático de zoom (`fit_bounds`) — tudo isso
-> foi preservado aqui. Também reparei que `streamlit-autorefresh` era usado
-> no dashboard mas nunca tinha entrado no `requirements.txt`; já corrigi.
-> **Use os arquivos desta entrega, não os da mensagem anterior.**
+> **Estado atual (23/08) — leia isto primeiro.** A arquitetura evoluiu depois
+> que este documento foi escrito. O que vale hoje:
+>
+> - O app está **publicado em https://chaintrack.streamlit.app** e tem **duas
+>   páginas**: o formulário do cidadão (principal) e o Dashboard da Prefeitura
+>   (`pages/1_Dashboard_da_Prefeitura.py`). O arquivo `dashboard.py` não existe
+>   mais — virou essa página.
+> - Rodando localmente, sobe tudo com **um comando só**:
+>   `streamlit run app.py` (ou dois cliques em `iniciar_demo.command`).
+> - **A antena não é mais acionada pelo app.** Um programa separado,
+>   `vigia_antena.py`, observa a blockchain e acende os LEDs. Isso permite que
+>   o registro venha da nuvem, de qualquer celular e qualquer rede.
+> - **Para tudo sobre a antena, use o `ANTENA_GUIA_RAPHAEL.md`**, que está
+>   atualizado. As seções sobre antena aqui embaixo são de referência histórica.
+
+> ⚠️ **Correção importante sobre o contrato (23/08).** Uma versão anterior deste
+> documento afirmava que o contrato usava `registrarOcorrencia(cid, descricao,
+> lat, lng)` com lat/lng como string. **Isso estava errado** e fez toda transação
+> reverter até ser descoberto. A função correta, no contrato realmente publicado
+> em `0xd991cBD01c207a546D50798931Ec838417261E7a`, é:
+>
+> ```
+> registrar(string cid, string descricao, string endereco, int256 lat, int256 lng)
+> ```
+>
+> com latitude e longitude como **inteiros multiplicados por 1.000.000**
+> (ex: -23.5505 vira -23550500). O `abi.json` do repositório já está correto;
+> o `abi_original_fase2.json` guarda a mesma referência.
+> Se voltar a aparecer "execution reverted", é o primeiro lugar a conferir —
+> rode `python3 diagnostico_registro.py`, que testa isso automaticamente.
 >
 > **Atualização 21/08:** o Raphael confirmou que a placa é uma **ESP32**
 > (não um Arduino Uno). Já corrigi o `arduino/antena_depin.ino` pra usar
@@ -23,7 +43,7 @@
 
 O que mudou em relação à Fase 2:
 
-1. **Antena de verdade (ESP32 + LED via USB serial)** — quando alguém registra uma ocorrência, o app manda um sinal pela porta serial e o LED da antena acende. Quando uma ocorrência é marcada como concluída, um segundo LED acende.
+1. **Antena de verdade (ESP32 + LED via USB serial)** — o programa `vigia_antena.py` observa a blockchain e acende o LED quando detecta uma ocorrência nova; um segundo LED acende quando detecta uma conclusão. A antena reage ao registro público, não a um comando do app.
 2. **Status manual no dashboard** — cada ocorrência agora tem um status: Recebida → Em andamento → Concluída, alterado manualmente no painel do dashboard.
 3. **Token "infinito" (CP — Cidadão Participativo)** — ao marcar uma ocorrência como Concluída, se ela tiver uma carteira associada, o sistema minta e envia automaticamente tokens CP pra essa carteira, na Polygon Amoy.
 4. **Campo de carteira no formulário** — o cidadão pode (opcionalmente) colar o endereço da sua wallet ao registrar, pra receber o token depois.
@@ -60,7 +80,7 @@ Veja os comentários no topo de `arduino/antena_depin.ino` — resumindo:
 5. Instale as dependências novas: `pip install -r requirements.txt` (inclui `pyserial` agora).
 6. Teste a antena isoladamente, sem precisar do Streamlit:
    ```
-   python antena_serial.py
+   python3 antena_serial.py
    ```
    Deve aparecer "Antena respondeu: 'ANTENA_PRONTA'" e o LED_REGISTRO piscar 3x.
 
@@ -72,7 +92,7 @@ Veja os comentários no topo de `arduino/antena_depin.ino` — resumindo:
 4. Copie o endereço do contrato deployado e cole em `TOKEN_CONTRACT_ADDRESS` no `.env`.
 5. Teste a conclusão + mint manualmente antes da apresentação:
    ```
-   python mint_token.py QmCIDdeTeste123 0xSEU_ENDERECO_DE_TESTE
+   python3 mint_token.py QmCIDdeTeste123 0xSEU_ENDERECO_DE_TESTE
    ```
    (o primeiro argumento pode ser qualquer texto de teste — na demo de verdade, o dashboard passa o CID real da ocorrência).
    Deve imprimir o hash da transação e um link do Polygonscan. Confira lá se o evento `OcorrenciaConcluida` e o saldo do token realmente chegaram na carteira de teste.
@@ -82,13 +102,13 @@ Veja os comentários no topo de `arduino/antena_depin.ino` — resumindo:
 Isso é 100% possível e não depende de nenhum hardware — o Raphael pode testar
 a ESP32 depois, em paralelo:
 
-1. Rode `streamlit run app.py`, preencha o formulário (foto, nome, endereço,
+1. Rode `streamlit run app.py` (ou abra https://chaintrack.streamlit.app), preencha o formulário (foto, nome, endereço,
    descrição) e cole um endereço de carteira de teste no campo de carteira.
 2. Envie — o registro aparece na blockchain (prova original da ocorrência)
    e cai no `registros.json` com status "Recebida".
-3. Rode `streamlit run dashboard.py`, abra essa ocorrência, mude o status pra
-   "Em andamento" (fica só local, não gera transação — a ideia é que a prova
-   de existência já saiu no passo 2).
+3. No menu lateral do app, abra o **Dashboard da Prefeitura**, encontre essa
+   ocorrência e mude o status pra "Em andamento" (fica só local, não gera
+   transação — a prova de existência já saiu no passo 2).
 4. Mude para "Concluída" — isso dispara a transação `concluirOcorrencia` de
    verdade na Polygon Amoy (se o `TOKEN_CONTRACT_ADDRESS` já estiver
    configurado), aparecendo o link pro Polygonscan mostrando a conclusão
@@ -97,20 +117,31 @@ a ESP32 depois, em paralelo:
 
 ## Rodando tudo
 
-Em terminais separados:
-```
-streamlit run app.py --server.port 8501        # formulário do cidadão
-streamlit run dashboard.py --server.port 8502   # dashboard/admin
-```
+**Na nuvem (recomendado para a demo):** basta abrir https://chaintrack.streamlit.app
+em qualquer navegador ou celular. Nada para instalar ou iniciar. Não aciona a antena.
 
-**Atenção:** evite atualizar o status no dashboard exatamente no mesmo segundo em que alguém está enviando um novo registro pelo app — os dois processos escrevem no mesmo `registros.json`, e uma escrita simultânea pode sobrescrever a outra. Na prática, com o ritmo humano de uma apresentação isso não costuma ser problema, mas vale coordenar durante a demo.
+**Localmente (único jeito de acender a antena):**
+```
+streamlit run app.py
+```
+ou dois cliques em `iniciar_demo.command`. As duas telas ficam no mesmo app —
+use o menu na barra lateral esquerda para alternar entre o formulário e o
+Dashboard da Prefeitura.
+
+Para a antena, em paralelo:
+```
+python3 vigia_antena.py
+```
+ou dois cliques em `iniciar_antena.command`.
 
 ## Checklist antes do dia 28
 
-- [ ] Arduino gravado com o sketch e testado (`python antena_serial.py` responde)
+- [ ] ESP32 gravada com o sketch e testada (`python3 antena_serial.py` responde)
 - [ ] Token CP deployado e mint testado manualmente
 - [ ] `.env` preenchido em todas as variáveis (Fase 2 + Fase 3)
 - [ ] Pelo menos 1 registro de teste enviado pelo app.py com carteira preenchida
 - [ ] Esse registro marcado como "Concluída" no dashboard e o token confirmado no Polygonscan
 - [ ] Antena com os LEDs fixados na maquete física, testados na posição final (às vezes o fio USB é curto demais — meça a distância até o notebook)
+- [ ] `vigia_antena.py` testado: registrar pelo celular e ver o LED acender
+- [ ] Decidido se a demo será pela nuvem (robusta, sem antena) ou local (com antena)
 - [ ] Ensaio completo do fluxo ao vivo pelo menos 2 vezes, cronometrado
