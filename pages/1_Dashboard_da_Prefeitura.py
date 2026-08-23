@@ -1,24 +1,39 @@
-import streamlit as st
+"""
+Dashboard da Prefeitura — DePIN Urbano, Fase 3
+
+Esta é a SEGUNDA PÁGINA do app. O Streamlit descobre sozinho tudo que está
+dentro da pasta "pages/" e monta o menu lateral automaticamente.
+
+Por que as duas telas precisam viver no MESMO app: elas se comunicam pelo
+arquivo registros.json. Se o formulário estivesse na nuvem e o dashboard no
+notebook, cada um teria o seu próprio arquivo e um não veria o que o outro
+gravou. Estando no mesmo app, dividem o mesmo espaço em disco.
+"""
+
+import sys
 import json
+from pathlib import Path
+
+import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
 
-from antena_serial import enviar_sinal
-from mint_token import concluir_ocorrencia
-from tema_visual import aplicar_tema
+# A pasta raiz do projeto é a "avó" deste arquivo (pages/ -> raiz).
+# Isso garante que os arquivos sejam encontrados independentemente de onde
+# o Streamlit for iniciado, tanto no notebook quanto na nuvem.
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from antena_serial import enviar_sinal          # noqa: E402
+from mint_token import concluir_ocorrencia      # noqa: E402
+from tema_visual import aplicar_tema            # noqa: E402
 
 st.set_page_config(page_title="Dashboard DePIN", page_icon="🗺️", layout="wide")
 aplicar_tema()
 
-# ===== Auto-refresh =====
-# Intervalo em milissegundos. 2000 = 2 segundos.
-# Aumente para 5000 se quiser um refresh mais suave durante a gravação.
 INTERVALO_MS = 2000
-st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
-
-st.title("🗺️ Dashboard DePIN Urbano")
-st.subheader("Ocorrências registradas")
 
 STATUS_LABELS = {
     "recebida": "🔴 Recebida",
@@ -32,7 +47,7 @@ STATUS_CORES_MAPA = {
 }
 LABEL_PARA_STATUS = {v: k for k, v in STATUS_LABELS.items()}
 
-REGISTROS_PATH = "registros.json"
+REGISTROS_PATH = BASE_DIR / "registros.json"
 
 
 def carregar_registros():
@@ -60,17 +75,85 @@ def salvar_registros(registros):
 
 registros = carregar_registros()
 
+# ===========================================================================
+# Conclusão on-chain: por que existe esta etapa separada
+#
+# A transação de conclusão leva de 5 a 30 segundos. O auto-refresh de 2s
+# reiniciaria o script no meio do envio e o resultado nunca apareceria na
+# tela. Por isso o fluxo é dividido em dois momentos:
+#
+#   1. O botão "Atualizar" apenas ANOTA que aquela ocorrência precisa ser
+#      concluída on-chain (em st.session_state) e recarrega a página.
+#   2. Nesse novo carregamento, o auto-refresh NÃO é montado, então nada
+#      interrompe a transação. Ela roda com calma e o resultado é guardado
+#      para ser exibido no carregamento seguinte.
+# ===========================================================================
+pendente = st.session_state.get("conclusao_pendente")
+
+if not pendente:
+    st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
+
+st.title("🗺️ Dashboard DePIN Urbano")
+
+if pendente:
+    alvo = next((r for r in registros if r.get("id") == pendente), None)
+
+    if alvo is None:
+        st.session_state.pop("conclusao_pendente", None)
+        st.rerun()
+
+    st.info(
+        "⏳ Registrando a conclusão na blockchain e enviando o token CP. "
+        "Isso leva de 5 a 30 segundos — **não feche nem atualize a página.**"
+    )
+    with st.spinner("Enviando transação para a Polygon Amoy..."):
+        try:
+            tx = concluir_ocorrencia(alvo["cid"], alvo["wallet"])
+            alvo["token_tx"] = tx
+            salvar_registros(registros)
+            st.session_state["conclusao_resultado"] = ("ok", tx)
+        except Exception as e:
+            st.session_state["conclusao_resultado"] = ("erro", str(e))
+
+    # Sinaliza a antena (nunca trava se ela não estiver conectada).
+    # Na nuvem a antena nunca responde, e isso é esperado: o LED só funciona
+    # quando o app roda no notebook ligado por USB à ESP32.
+    enviar_sinal("CONCLUIDA")
+
+    st.session_state.pop("conclusao_pendente", None)
+    st.rerun()
+
+resultado = st.session_state.pop("conclusao_resultado", None)
+if resultado:
+    tipo, valor = resultado
+    if tipo == "ok":
+        st.success("✅ Conclusão registrada na blockchain e token CP enviado!")
+        st.markdown(
+            f"🔗 [Ver a transação no Polygonscan](https://amoy.polygonscan.com/tx/{valor})"
+        )
+    elif tipo == "sem_carteira":
+        st.warning(
+            "Ocorrência marcada como concluída, mas sem carteira informada — "
+            "nenhuma transação de conclusão foi enviada."
+        )
+    else:
+        st.error(
+            f"⚠️ Falha ao registrar a conclusão on-chain: {valor}\n\n"
+            "O status foi salvo como concluída mesmo assim. Selecione "
+            "**Concluída** e clique em **Atualizar** de novo para tentar outra vez."
+        )
+
+st.subheader("Ocorrências registradas")
+
 if registros:
     st.write(f"**{len(registros)} ocorrência(s) registrada(s)**")
 
-    # Centraliza o mapa automaticamente na média das coordenadas
     lats = [r["latitude"] for r in registros]
     lons = [r["longitude"] for r in registros]
     centro = [sum(lats) / len(lats), sum(lons) / len(lons)]
 
     mapa = folium.Map(location=centro, zoom_start=12)
 
-    # Ajusta o zoom para enquadrar todos os pontos
     if len(registros) > 1:
         mapa.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
 
@@ -136,9 +219,6 @@ if registros:
             if atualizar:
                 novo_status = LABEL_PARA_STATUS[label_escolhido]
                 mudou_status = novo_status != status_atual
-                # Se já está "concluída" mas a transação on-chain falhou antes
-                # (token_tx ainda vazio), o botão tenta de novo mesmo sem
-                # mudar o status — é o "tentar de novo" prometido no erro.
                 precisa_tentar_onchain = (
                     novo_status == "concluida" and not r.get("token_tx")
                 )
@@ -147,32 +227,16 @@ if registros:
                     st.info("Esse já é o status atual.")
                 else:
                     r["status"] = novo_status
+                    salvar_registros(registros)
 
                     if precisa_tentar_onchain:
                         if r.get("wallet"):
-                            try:
-                                tx = concluir_ocorrencia(r["cid"], r["wallet"])
-                                r["token_tx"] = tx
-                                st.success(
-                                    f"✅ Conclusão registrada na blockchain e token CP enviado! "
-                                    f"Tx: {tx}"
-                                )
-                            except Exception as e:
-                                st.error(
-                                    f"⚠️ Falha ao registrar a conclusão on-chain: {e}. "
-                                    f"Status salvo como concluída mesmo assim; "
-                                    f"clique em Atualizar de novo (com Concluída "
-                                    f"selecionada) para tentar mais uma vez."
-                                )
+                            st.session_state["conclusao_pendente"] = r["id"]
                         else:
-                            st.warning(
-                                "Ocorrência concluída, mas sem carteira informada — "
-                                "nenhuma transação de conclusão foi enviada."
-                            )
-                        # Sinaliza a antena (não trava se ela não estiver conectada)
-                        enviar_sinal("CONCLUIDA")
+                            st.session_state["conclusao_resultado"] = (
+                                "sem_carteira", "")
+                            enviar_sinal("CONCLUIDA")
 
-                    salvar_registros(registros)
                     st.rerun()
 else:
     st.warning(

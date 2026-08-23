@@ -3,6 +3,7 @@ import json
 import os
 import re
 import uuid
+from pathlib import Path
 from web3 import Web3
 
 import requests
@@ -12,7 +13,15 @@ from dotenv import load_dotenv
 from antena_serial import enviar_sinal
 from tema_visual import aplicar_tema
 
-load_dotenv()
+# Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
+# porque o app agora tem duas páginas (a segunda vive em pages/), e caminhos
+# relativos deixariam de apontar para o lugar certo dependendo de qual página
+# estivesse sendo executada.
+BASE_DIR = Path(__file__).resolve().parent
+ABI_PATH = BASE_DIR / "abi.json"
+REGISTROS_PATH = BASE_DIR / "registros.json"
+
+load_dotenv(BASE_DIR / ".env")
 
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
@@ -42,34 +51,62 @@ if missing_env_vars:
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
-with open("abi.json") as f:
+with open(ABI_PATH) as f:
     CONTRACT_ABI = json.load(f)
 
 contract = w3.eth.contract(address=Web3.to_checksum_address(
     CONTRACT_ADDRESS), abi=CONTRACT_ABI)
 
 
-def registrar_blockchain(cid, descricao, latitude, longitude):
+# O contrato publicado na Amoy (o mesmo desde a Fase 2, com 13 registros)
+# guarda latitude e longitude como INTEIROS, multiplicados por 1.000.000.
+# Ex: -23.5505 vira -23550500. É assim que os 13 registros existentes estão
+# gravados, então mantemos a mesma convenção.
+COORD_ESCALA = 1_000_000
+
+
+def registrar_blockchain(cid, descricao, endereco, latitude, longitude):
     """
-    Chama registrarOcorrencia(string _cid, string _descricao, string _lat, string _lng)
-    O contrato Ocorrencia.sol guarda lat/lng como STRING, entao convertemos com str().
-    Retorna o hash da transacao (sem o prefixo 0x; ele e adicionado na hora de montar o link).
+    Chama registrar(string _cid, string _descricao, string _endereco,
+                    int256 _latitude, int256 _longitude) no contrato da Fase 2.
+
+    O gas não é mais fixo: perguntamos à blockchain quanto a chamada vai
+    custar e adicionamos 30% de folga. Além de evitar falta de gas, o
+    estimate_gas revela ANTES de enviar se a chamada iria reverter — assim
+    não se paga por uma transação que falharia.
+
+    Retorna o hash da transação já com o prefixo "0x".
     """
-    nonce = w3.eth.get_transaction_count(WALLET_ADDRESS)
-    tx = contract.functions.registrarOcorrencia(
+    conta = Web3.to_checksum_address(WALLET_ADDRESS)
+    fn = contract.functions.registrar(
         cid,
         descricao,
-        str(latitude),
-        str(longitude)
-    ).build_transaction({
-        "from": WALLET_ADDRESS,
+        endereco,
+        int(latitude * COORD_ESCALA),
+        int(longitude * COORD_ESCALA),
+    )
+
+    try:
+        gas = int(fn.estimate_gas({"from": conta}) * 1.3)
+    except Exception:
+        # Se a estimativa falhar (RPC instável, por exemplo), usa um teto
+        # generoso. Lembrando: gas é limite, não cobrança — o que sobra volta.
+        gas = 900_000
+
+    nonce = w3.eth.get_transaction_count(conta)
+    tx = fn.build_transaction({
+        "from": conta,
         "nonce": nonce,
-        "gas": 600000,
+        "gas": gas,
         "gasPrice": w3.eth.gas_price,
     })
     signed_tx = w3.eth.account.sign_transaction(tx, PRIVATE_KEY)
     tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-    return tx_hash.hex()
+
+    tx_hex = tx_hash.hex()
+    if not tx_hex.startswith("0x"):
+        tx_hex = "0x" + tx_hex
+    return tx_hex
 
 
 def upload_ipfs(arquivo):
@@ -106,8 +143,14 @@ aplicar_tema()
 st.title("📡 DePIN Urbano")
 st.subheader("Registre um problema na sua cidade")
 
-foto = st.camera_input("Tire uma foto do problema") or st.file_uploader(
-    "Ou envie uma foto", type=["jpg", "jpeg", "png"])
+# A câmera nativa (st.camera_input) só é liberada pelo navegador em páginas
+# https:// ou em localhost. Acessando pelo celular via IP da rede local
+# (http://192.168.x.x), o navegador bloqueia — por isso o campo de upload
+# abaixo é o caminho principal no celular: no iOS ele abre o menu com
+# "Tirar Foto ou Vídeo", ou seja, a foto continua sendo tirada na hora.
+foto = st.camera_input("📷 Tirar foto agora (só funciona no notebook)") or st.file_uploader(
+    "📱 Pelo celular: toque aqui e escolha 'Tirar Foto ou Vídeo'",
+    type=["jpg", "jpeg", "png"])
 
 st.markdown("### Seus dados")
 nome = st.text_input("Nome completo")
@@ -156,17 +199,19 @@ if st.button("Enviar ocorrência"):
             else:
                 st.success("📍 Endereço localizado com precisão.")
 
+            endereco_completo = f"{rua}, {numero} - {bairro}, {cidade} - {estado}, {cep}"
+
             try:
                 with st.spinner("Registrando na blockchain..."):
                     tx_hash = registrar_blockchain(
-                        cid, descricao, latitude, longitude)
+                        cid, descricao, endereco_completo, latitude, longitude)
                     recibo = w3.eth.wait_for_transaction_receipt(
                         tx_hash, timeout=120)
 
                 if recibo.status == 1:
                     st.success("✅ Registrado na blockchain!")
                     st.markdown(
-                        f"🔗 [Ver no PolygonScan](https://amoy.polygonscan.com/tx/0x{tx_hash})")
+                        f"🔗 [Ver no PolygonScan](https://amoy.polygonscan.com/tx/{tx_hash})")
                 else:
                     st.error(
                         "❌ A transação foi minerada mas reverteu (status 0). "
@@ -185,7 +230,7 @@ if st.button("Enviar ocorrência"):
             registro = {
                 "id": uuid.uuid4().hex[:8],
                 "nome": nome,
-                "endereco": f"{rua}, {numero} - {bairro}, {cidade} - {estado}, {cep}",
+                "endereco": endereco_completo,
                 "descricao": descricao,
                 "latitude": latitude,
                 "longitude": longitude,
@@ -195,7 +240,7 @@ if st.button("Enviar ocorrência"):
                 "wallet": wallet_limpa,
                 "token_tx": "",
             }
-            with open("registros.json", "a") as f:
+            with open(REGISTROS_PATH, "a") as f:
                 f.write(json.dumps(registro) + "\n")
             st.balloons()
         else:

@@ -23,10 +23,16 @@ do token (ou seja, a mesma conta que fez o deploy no Remix).
 
 import os
 import json
+from pathlib import Path
 from web3 import Web3
 from dotenv import load_dotenv
 
-load_dotenv()
+# Caminhos absolutos: este módulo é importado tanto pela página principal
+# quanto pela página do dashboard (que vive em pages/), então não dá para
+# depender de caminho relativo.
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(BASE_DIR / ".env")
 
 PRIVATE_KEY = os.getenv("PRIVATE_KEY")
 WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
@@ -37,7 +43,7 @@ TOKEN_DECIMALS = 18
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
-with open("token_abi.json") as f:
+with open(BASE_DIR / "token_abi.json") as f:
     TOKEN_ABI = json.load(f)
 
 _token_contract = None
@@ -95,7 +101,13 @@ def concluir_ocorrencia(cid: str, wallet_destino: str, quantidade_tokens: float 
             "Confira se a wallet configurada é a dona (owner) do contrato do token."
         )
 
-    return tx_hash.hex()
+    # Dependendo da versão do web3.py, .hex() vem com ou sem o prefixo "0x".
+    # Normalizamos aqui para que os links do Polygonscan (no dashboard e no
+    # teste pela linha de comando) funcionem sempre.
+    tx_hex = tx_hash.hex()
+    if not tx_hex.startswith("0x"):
+        tx_hex = "0x" + tx_hex
+    return tx_hex
 
 
 if __name__ == "__main__":

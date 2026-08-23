@@ -16,7 +16,23 @@ Uso:
 
 import os
 import time
-import serial  # pyserial
+
+# O pyserial é importado de forma tolerante: se a biblioteca não estiver
+# instalada na máquina (por exemplo, num notebook que só vai rodar o
+# dashboard, sem antena), o app PRECISA continuar funcionando. Sem essa
+# proteção, um "import serial" no topo derrubaria o app inteiro só porque
+# a antena não está em uso.
+try:
+    import serial  # pyserial
+    SERIAL_DISPONIVEL = True
+except ImportError:
+    serial = None
+    SERIAL_DISPONIVEL = False
+    print(
+        "[antena] Biblioteca 'pyserial' não instalada — a antena fica "
+        "desativada, mas o resto do sistema funciona normalmente. "
+        "Para habilitar: pip3 install pyserial"
+    )
 
 # Configuração via .env (veja .env.example)
 #   Windows costuma ser algo como "COM3", "COM4"...
@@ -36,8 +52,12 @@ def enviar_sinal(comando: str, timeout: float = 3.0) -> bool:
     e fecha a conexão em seguida.
 
     Retorna True se o comando foi enviado, False se a antena não está
-    acessível (não plugada, porta errada, etc). Nunca lança exceção.
+    acessível (não plugada, porta errada, pyserial ausente, etc).
+    Nunca lança exceção.
     """
+    if not SERIAL_DISPONIVEL:
+        print(f"[antena] Sinal '{comando}' ignorado: pyserial não instalado.")
+        return False
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=timeout) as ser:
             time.sleep(TEMPO_BOOT_ARDUINO)
@@ -52,8 +72,11 @@ def testar_conexao() -> bool:
     """
     Testa rapidamente se a antena responde "ANTENA_PRONTA" ao conectar.
     Útil para rodar antes da apresentação e confirmar que está tudo certo.
-    Rode: python antena_serial.py
+    Rode: python3 antena_serial.py
     """
+    if not SERIAL_DISPONIVEL:
+        print("[antena] pyserial não instalado. Rode: pip3 install pyserial")
+        return False
     try:
         with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=3.0) as ser:
             time.sleep(TEMPO_BOOT_ARDUINO)
