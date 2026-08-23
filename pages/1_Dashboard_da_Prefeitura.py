@@ -30,7 +30,12 @@ from antena_serial import enviar_sinal          # noqa: E402
 from mint_token import concluir_ocorrencia      # noqa: E402
 from tema_visual import aplicar_tema            # noqa: E402
 
-st.set_page_config(page_title="Dashboard DePIN", page_icon="🗺️", layout="wide")
+st.set_page_config(
+    page_title="Dashboard DePIN",
+    page_icon="🗺️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 aplicar_tema()
 
 INTERVALO_MS = 2000

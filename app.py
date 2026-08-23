@@ -40,7 +40,11 @@ required_env_vars = {
 missing_env_vars = [name for name, value in required_env_vars.items() if not value]
 
 if missing_env_vars:
-    st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
+    st.set_page_config(
+        page_title="DePIN Urbano",
+        page_icon="📡",
+        initial_sidebar_state="expanded",
+    )
     aplicar_tema()
     st.title("📡 DePIN Urbano")
     st.error(
@@ -138,7 +142,14 @@ def wallet_valida(endereco: str) -> bool:
     return bool(WALLET_REGEX.match(endereco.strip()))
 
 
-st.set_page_config(page_title="DePIN Urbano", page_icon="📡")
+st.set_page_config(
+    page_title="DePIN Urbano",
+    page_icon="📡",
+    # Mantém o menu de páginas sempre visível na lateral. Sem isso o
+    # Streamlit às vezes começa com a barra recolhida, e o botão de abrir
+    # é discreto demais para se procurar no meio de uma apresentação.
+    initial_sidebar_state="expanded",
+)
 aplicar_tema()
 st.title("📡 DePIN Urbano")
 st.subheader("Registre um problema na sua cidade")
