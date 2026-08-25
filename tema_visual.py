@@ -158,77 +158,127 @@ _CSS = """
         font-style: italic;
     }
 
-    /* ---------- Listas suspensas e campos numéricos ----------
-       O padrão do Streamlit desenha esses campos quase sem contorno, e num
-       fundo claro eles somem: a pessoa não percebe que ali tem algo para
-       clicar. Como são justamente os controles que movimentam o atendimento
-       (situação, equipe responsável, prazo), eles precisam parecer botões.
+    /* ---------- Campos que a pessoa preenche ----------
+       Listas suspensas, campo numérico e área de arquivo recebem o mesmo
+       tratamento: caixa branca, borda visível, cantos arredondados e uma
+       sombra leve. Sem isso eles somem no fundo claro e a pessoa não
+       percebe que ali tem algo para tocar.
 
-       Os seletores são vários de propósito. O Streamlit muda a estrutura
-       interna desses componentes entre versões, e um seletor único que
-       funcionava ontem pode não encontrar nada amanhã. Listando as formas
-       conhecidas, o contorno aparece em qualquer uma delas.  */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"],
+       Os nomes usados abaixo (stSelectbox, stNumberInputContainer e
+       companhia) são os que o próprio Streamlit coloca no HTML nesta
+       versão. Uma tentativa anterior mirou em "data-baseweb", que a
+       biblioteca usava antigamente e não usa mais — por isso o contorno
+       aparecia no campo numérico e não nas listas.  */
+
+    /* Lista suspensa: a caixa é o elemento com role="group", que envolve
+       o texto e a setinha. */
+    div[data-testid="stSelectbox"] div[role="group"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #C3D0E0 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        min-height: 46px;
+        cursor: pointer !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stSelectbox"] div[role="group"]:hover,
+    div[data-testid="stSelectbox"] div[role="group"]:focus-within {
+        border-color: #5B8FB9 !important;
+        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
+    }
+    div[data-testid="stSelectbox"] input {
+        background: transparent !important;
+        border: none !important;
+        color: #33404D !important;
+        cursor: pointer !important;
+    }
+    div[data-testid="stSelectbox"] button {
+        background: transparent !important;
+        border: none !important;
+        cursor: pointer !important;
+    }
+    div[data-testid="stSelectbox"] svg {
+        color: #5B8FB9 !important;
+    }
+
+    /* A MESMA caixa, para a estrutura antiga do componente.
+       O Streamlit trocou a biblioteca das listas suspensas: nas versões
+       novas a caixa é o elemento com role="group" (regra acima), nas
+       antigas era um div marcado com data-baseweb. Como a máquina que
+       publica o app pode estar numa versão diferente da que usamos para
+       desenvolver, as duas formas ficam descritas. Elas nunca coexistem
+       no mesmo HTML, então não há risco de desenhar caixa dentro de
+       caixa: a que não existir simplesmente não encontra nada. */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         border: 1px solid #C3D0E0 !important;
         border-radius: 10px !important;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        min-height: 46px;
         cursor: pointer !important;
     }
-    /* O contorno precisa existir uma vez só. As camadas internas herdam a
-       borda pelos seletores acima; aqui as de dentro voltam a ser lisas,
-       para não desenhar caixa dentro de caixa. */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
+    div[data-baseweb="select"] > div:hover {
+        border-color: #5B8FB9 !important;
+        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
+    }
+    div[data-baseweb="select"] > div > div {
         border: none !important;
-        border-radius: 0 !important;
         background: transparent !important;
     }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
-        min-height: 46px;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.16) !important;
-    }
-    div[data-baseweb="select"] svg {
-        color: #5B8FB9 !important;
-    }
 
-    /* Campo numérico: o contorno vai na caixa inteira, englobando o valor e
-       os botões de mais e menos. Sem isso, os dois botõezinhos parecem
-       soltos na página, sem relação com o número ao lado. */
-    div[data-testid="stNumberInput"] div[data-baseweb="input"],
-    div[data-testid="stNumberInput"] > div > div {
+    /* Campo numérico: a borda envolve o número junto com os botões de mais
+       e menos. Soltos, eles não parecem ter relação com o valor ao lado. */
+    div[data-testid="stNumberInputContainer"] {
         background-color: #FFFFFF !important;
         border: 1px solid #C3D0E0 !important;
         border-radius: 10px !important;
         box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
         overflow: hidden;
         min-height: 46px;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    div[data-testid="stNumberInput"] div[data-baseweb="input"]:hover {
+    div[data-testid="stNumberInputContainer"]:hover,
+    div[data-testid="stNumberInputContainer"]:focus-within {
         border-color: #5B8FB9 !important;
-        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.16) !important;
+        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
     }
-    div[data-testid="stNumberInput"] input {
-        background-color: transparent !important;
-        color: #33404D !important;
+    div[data-testid="stNumberInputField"] {
+        background: transparent !important;
         border: none !important;
+        color: #33404D !important;
     }
-    div[data-testid="stNumberInput"] button {
+    div[data-testid="stNumberInputStepUp"],
+    div[data-testid="stNumberInputStepDown"],
+    button[data-testid="stNumberInputStepUp"],
+    button[data-testid="stNumberInputStepDown"] {
         background-color: #EEF4FA !important;
         border-left: 1px solid #C3D0E0 !important;
         cursor: pointer !important;
     }
-    div[data-testid="stNumberInput"] button:hover {
+    button[data-testid="stNumberInputStepUp"]:hover,
+    button[data-testid="stNumberInputStepDown"]:hover {
         background-color: #DCE8F4 !important;
     }
 
-    /* Área de envio de arquivo: mesma lógica, precisa parecer clicável. */
+    /* Campos de texto: mesma borda das listas, para a coluna inteira ficar
+       com um desenho só. */
+    div[data-testid="stTextInputRootElement"],
+    div[data-testid="stTextAreaRootElement"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #C3D0E0 !important;
+        border-radius: 10px !important;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.08) !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stTextInputRootElement"]:focus-within,
+    div[data-testid="stTextAreaRootElement"]:focus-within {
+        border-color: #5B8FB9 !important;
+        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.15) !important;
+    }
+
+    /* Área de envio de arquivo. */
     section[data-testid="stFileUploaderDropzone"] {
         background-color: #FFFFFF !important;
         border: 1px dashed #C3D0E0 !important;
