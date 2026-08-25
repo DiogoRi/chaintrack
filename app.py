@@ -418,6 +418,15 @@ if enviar:
                 # porque a blockchain falhou naquele momento.
                 "tx_registro": tx_hash if onchain_ok else "",
                 "onchain": onchain_ok,
+                # Campos da etapa de atendimento. Nascem vazios: quem os
+                # preenche é o painel do município, conforme a ocorrência
+                # avança. O prazo só começa a correr quando ela é encaminhada
+                # a uma equipe, então aqui ainda não há data nenhuma.
+                "setor": "Não atribuído",
+                "prazo_dias": 10,
+                "data_andamento": "",
+                "data_conclusao": "",
+                "mensagens": [],
             }
             with open(REGISTROS_PATH, "a") as f:
                 f.write(json.dumps(registro) + "\n")
@@ -472,6 +481,11 @@ if comprovante:
         "**Obrigado por ser um cidadão participativo e contribuir para uma "
         "cidade melhor.** Guarde este comprovante: ele reúne os links que "
         "comprovam o seu registro."
+    )
+    st.info(
+        "🔎 **Guarde o número de protocolo.** Com ele você acompanha o "
+        "andamento na página **Acompanhar ocorrência**, no menu ao lado, sem "
+        "precisar de login."
     )
 
     link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
@@ -533,6 +547,12 @@ if comprovante:
         f"Registro na blockchain: {link_tx or 'não concluído'}",
         f"Foto no IPFS:           {link_foto}",
         f"Impressão digital:      {comprovante['cid']}",
+        "",
+        "COMO ACOMPANHAR",
+        "-" * 46,
+        "Acesse https://chaintrack.streamlit.app, vá em",
+        "'Acompanhar ocorrência' e informe o número de protocolo",
+        "no alto deste comprovante. Não é preciso fazer login.",
         "",
         "Obrigado por ser um cidadão participativo e contribuir",
         "para uma cidade melhor.",
