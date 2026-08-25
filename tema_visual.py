@@ -87,9 +87,9 @@ _CSS = """
         color: #FFFFFF;
         border: none;
         border-radius: 10px;
-        padding: 0.8rem 1.8rem;
+        padding: 0.9rem 2rem;
         font-weight: 650;
-        font-size: 1.35rem;
+        font-size: 1.55rem;
         text-transform: none;
         letter-spacing: 0;
         box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
