@@ -139,6 +139,19 @@ _CSS = """
         font-style: italic;
     }
 
+    /* ---------- Lista de grupos do dashboard ----------
+       O seletor de grupos (Recebidas / Em andamento / Concluídas /
+       Arquivadas) aparece empilhado. Aumentamos a fonte e o espaçamento
+       para que cada linha seja fácil de acertar com o dedo no celular. */
+    div[role="radiogroup"] label p {
+        font-size: 1.12rem !important;
+        font-weight: 600 !important;
+        color: #33404D !important;
+    }
+    div[role="radiogroup"] > label {
+        padding: 0.35rem 0;
+    }
+
     /* ---------- Cartões (expanders) ---------- */
     div[data-testid="stExpander"] {
         background-color: #FFFFFF;

@@ -239,8 +239,8 @@ if registros:
         # todas as linhas ficam com a mesma altura, em vez de umas com uma
         # linha e outras com quatro.
         desc = r.get("descricao", "Sem descrição")
-        if len(desc) > 60:
-            desc = desc[:60].rstrip() + "…"
+        if len(desc) > 40:
+            desc = desc[:40].rstrip() + "…"
         titulo = (f"{STATUS_LABELS.get(status_atual, status_atual)}  "
                   f"{protocolo_de(r)}  ·  {data_curta(r)}  ·  {desc}")
         with st.expander(titulo):
@@ -337,48 +337,45 @@ if registros:
     arquivadas = ordenar_por_data(
         [r for r in registros if r.get("arquivada")])
 
-    aba_recebidas, aba_andamento, aba_concluidas, aba_arquivadas = st.tabs([
-        f"🔴 Recebidas ({len(recebidas)})",
-        f"🟠 Em andamento ({len(em_andamento)})",
-        f"🟢 Concluídas ({len(concluidas)})",
-        f"🗂️ Arquivadas ({len(arquivadas)})",
-    ])
+    # Lista vertical em vez de abas lado a lado: no celular, quatro abas
+    # horizontais ficam apertadas e a contagem some. Empilhadas, cada grupo
+    # ocupa uma linha inteira e o número fica sempre visível.
+    GRUPOS = [
+        (f"🔴 Recebidas ({len(recebidas)})", recebidas,
+         "Nenhuma ocorrência aguardando atendimento.", "sucesso"),
+        (f"🟠 Em andamento ({len(em_andamento)})", em_andamento,
+         "Nenhuma ocorrência em andamento no momento.", "info"),
+        (f"🟢 Concluídas ({len(concluidas)})", concluidas,
+         "Nenhuma ocorrência concluída ainda.", "info"),
+        (f"🗂️ Arquivadas ({len(arquivadas)})", arquivadas,
+         "Nenhuma ocorrência arquivada ainda.", "info"),
+    ]
 
-    with aba_recebidas:
-        if recebidas:
-            for r in recebidas:
-                mostrar_ocorrencia(r)
-        else:
-            st.success("Nenhuma ocorrência aguardando atendimento.")
+    rotulos = [g[0] for g in GRUPOS]
+    escolhido = st.radio("Ver:", rotulos, key="filtro_grupo",
+                         label_visibility="collapsed")
 
-    with aba_andamento:
-        if em_andamento:
-            for r in em_andamento:
-                mostrar_ocorrencia(r)
-        else:
-            st.info("Nenhuma ocorrência em andamento no momento.")
+    st.markdown("---")
 
-    with aba_concluidas:
-        if concluidas:
-            for r in concluidas:
-                mostrar_ocorrencia(r)
-        else:
-            st.info("Nenhuma ocorrência concluída ainda.")
+    _, lista, vazio, tipo_vazio = next(g for g in GRUPOS if g[0] == escolhido)
 
-    with aba_arquivadas:
+    if escolhido.startswith("🗂️"):
         st.markdown(
-            "Ocorrências já atendidas saem das abas do dia a dia e ficam "
+            "Ocorrências já atendidas saem das listas do dia a dia e ficam "
             "guardadas aqui, mantendo o histórico do que a cidade resolveu. "
             "**Nada é apagado:** o registro de cada uma continua público e "
             "permanente na blockchain, e qualquer ocorrência pode ser "
             "restaurada a qualquer momento."
         )
         st.markdown("")
-        if arquivadas:
-            for r in arquivadas:
-                mostrar_ocorrencia(r)
-        else:
-            st.info("Nenhuma ocorrência arquivada ainda.")
+
+    if lista:
+        for r in lista:
+            mostrar_ocorrencia(r)
+    elif tipo_vazio == "sucesso":
+        st.success(vazio)
+    else:
+        st.info(vazio)
 else:
     st.warning(
         "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")
