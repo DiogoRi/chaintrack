@@ -70,6 +70,25 @@ _CSS = """
         margin: 0.4rem 0 0.6rem 0 !important;
     }
 
+    /* ---------- Títulos da página "Sobre o projeto" ----------
+       Menor que o do dashboard para caber numa linha só no celular, e com
+       margem positiva entre título e subtítulo (a classe da frase de
+       impacto usa margem negativa, que aqui colaria os dois). */
+    .titulo-sobre {
+        font-size: 2.6rem !important;
+        font-weight: 700 !important;
+        color: #3D6E94 !important;
+        letter-spacing: -0.5px;
+        line-height: 1.15;
+        margin: 0 0 0.9rem 0 !important;
+    }
+    .subtitulo-sobre {
+        font-size: 1.4rem !important;
+        font-weight: 500 !important;
+        color: #6B8FA8 !important;
+        margin: 0 0 1.6rem 0 !important;
+    }
+
     /* ---------- Frase de impacto ----------
        Fica entre o título e o subtítulo. Tamanho intermediário de propósito:
        maior que o texto comum, para ser lida de longe numa projeção, mas
