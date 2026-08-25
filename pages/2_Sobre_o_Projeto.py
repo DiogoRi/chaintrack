@@ -64,7 +64,10 @@ st.markdown("""
 3. **Os dados vão para a blockchain** (Polygon Amoy). A partir daí ninguém
    pode apagar ou alterar o registro: nem a prefeitura, nem quem atende as
    ocorrências, nem quem desenvolveu o sistema.
-4. **A antena física acende**, sinalizando que a rede recebeu a ocorrência.
+4. **A antena física observa a blockchain** e acende ao detectar o novo
+   registro. Ela não é avisada pelo aplicativo: lê o contrato por conta
+   própria. É essa independência que a torna um nó da rede, e não um
+   acessório do sistema.
 5. **A prefeitura acompanha** pelo painel: Recebida → Em andamento → Concluída.
 6. **Ao concluir**, uma única operação registra publicamente o atendimento e
    envia os tokens ao cidadão. As duas coisas ficam inseparáveis.
@@ -76,7 +79,7 @@ st.markdown("""
 | Camada | Função |
 | --- | --- |
 | **Coleta** | Interface web acessada pelo celular, onde o cidadão envia foto, descrição e localização. |
-| **Rede DePIN (antena)** | Nó físico que observa a blockchain e sinaliza a atividade da rede. Nesta fase representa o nó; a evolução é transportar o registro por LoRaWAN. |
+| **Rede DePIN (antena)** | Nó físico que observa a blockchain por conta própria e sinaliza a atividade da rede. Nesta fase representa o nó; a evolução é transportar o registro por LoRaWAN. |
 | **Armazenamento híbrido** | A imagem fica no IPFS; apenas os metadados vão para a blockchain. Guardar imagens on-chain seria caro e desnecessário. |
 """)
 
@@ -144,6 +147,26 @@ st.markdown("""
 | Integração | web3.py |
 | Hardware | ESP32, comunicação por USB serial |
 | Mapa | Folium / OpenStreetMap |
+""")
+
+st.markdown("### O que é protótipo e o que seria produção")
+
+st.markdown("""
+Este é um protótipo funcional, e algumas simplificações foram escolhas
+conscientes, não descuidos. Vale dizer quais são e o que mudaria numa versão
+de produção.
+
+| Simplificação atual | Por que agora | O que mudaria em produção |
+| --- | --- | --- |
+| A lista de ocorrências fica num arquivo local | Basta para demonstrar o fluxo, e a prova que importa já está na blockchain | Banco de dados, com histórico de atendimento e backup |
+| O painel da prefeitura não exige login por padrão | Facilita a demonstração ao vivo | Login por servidor, com registro de quem alterou cada status |
+| Uma única carteira assina as operações | Simplifica o protótipo | Separação de papéis e assinatura múltipla para emitir tokens |
+| O contrato não impede recompensar a mesma ocorrência duas vezes | Não acontece no uso normal do painel | Trava no próprio contrato, marcando cada ocorrência já paga |
+| Rede de testes (Polygon Amoy) | Permite testar sem custo real | Rede principal, com custo por transação previsto no orçamento |
+
+O ponto central é que **nenhuma dessas simplificações afeta a garantia
+principal do projeto**: a ocorrência registrada na blockchain continua
+pública, permanente e verificável por qualquer pessoa.
 """)
 
 st.markdown("### Evolução do projeto")

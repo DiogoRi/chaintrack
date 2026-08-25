@@ -10,7 +10,6 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 
-from antena_serial import enviar_sinal
 from tema_visual import aplicar_tema
 
 # Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
@@ -364,6 +363,7 @@ if enviar:
             endereco_completo = " - ".join(partes_endereco)
 
             tx_hash = ""
+            onchain_ok = False
             try:
                 with st.spinner("Registrando na blockchain..."):
                     tx_hash = registrar_blockchain(
@@ -372,6 +372,7 @@ if enviar:
                         tx_hash, timeout=120)
 
                 if recibo.status == 1:
+                    onchain_ok = True
                     st.success("✅ Registrado na blockchain!")
                     st.markdown(
                         f"🔗 [Ver o registro no PolygonScan](https://amoy.polygonscan.com/tx/{tx_hash})")
@@ -386,13 +387,14 @@ if enviar:
             except Exception as e:
                 st.warning(f"Falha ao registrar na blockchain: {e}")
 
-            # Sinaliza a antena física (nunca trava o app se ela não responder)
-            antena_ok = enviar_sinal("REGISTRO")
-            if antena_ok:
-                st.info("📡 Antena acionada — nó da rede recebeu o sinal.")
-            else:
-                st.info(
-                    "📡 Antena não respondeu (ok para testar sem hardware conectado).")
+            # O app NÃO aciona a antena. Quem faz isso é o vigia_antena.py,
+            # observando a blockchain de forma independente. Manter as duas
+            # coisas geraria acionamento duplicado e, pior, enfraqueceria a
+            # tese do projeto: a antena não deve confiar no aplicativo, e sim
+            # no registro público.
+            st.info(
+                "📡 A antena da rede detecta este registro diretamente na "
+                "blockchain, sem depender deste aplicativo.")
 
             protocolo = uuid.uuid4().hex[:8].upper()
             momento = datetime.now().strftime("%d/%m/%Y às %H:%M")
@@ -410,6 +412,12 @@ if enviar:
                 "status": "recebida",
                 "wallet": wallet_limpa,
                 "token_tx": "",
+                # Hash da transação de registro. Guardar isso permite que o
+                # dashboard mostre a prova on-chain de cada ocorrência e,
+                # principalmente, distinga as que ficaram só no arquivo local
+                # porque a blockchain falhou naquele momento.
+                "tx_registro": tx_hash if onchain_ok else "",
+                "onchain": onchain_ok,
             }
             with open(REGISTROS_PATH, "a") as f:
                 f.write(json.dumps(registro) + "\n")

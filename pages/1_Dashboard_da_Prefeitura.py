@@ -26,7 +26,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from antena_serial import enviar_sinal          # noqa: E402
 from mint_token import concluir_ocorrencia      # noqa: E402
 from tema_visual import aplicar_tema            # noqa: E402
 
@@ -37,6 +36,44 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 aplicar_tema()
+
+
+# ---------------------------------------------------------------------------
+# Acesso ao painel
+# ---------------------------------------------------------------------------
+# Este painel é a visão de quem atende as ocorrências: muda status, conclui e
+# dispara o envio de tokens. Publicado na internet, ficaria aberto a qualquer
+# um. A proteção é opcional de propósito: se a senha não estiver configurada,
+# o painel abre normalmente (útil na demonstração e no notebook). Basta criar
+# SENHA_DASHBOARD nos Secrets do Streamlit para que ela passe a ser exigida.
+def _senha_configurada():
+    try:
+        return str(st.secrets.get("SENHA_DASHBOARD", "")).strip()
+    except Exception:
+        return ""
+
+
+def exigir_acesso():
+    senha = _senha_configurada()
+    if not senha:
+        return
+    if st.session_state.get("dashboard_liberado"):
+        return
+
+    st.markdown("<p class='titulo-dashboard'>Painel da Prefeitura</p>",
+                unsafe_allow_html=True)
+    st.info("Esta área é restrita à equipe que atende as ocorrências.")
+    digitada = st.text_input("Senha de acesso", type="password")
+    if digitada:
+        if digitada == senha:
+            st.session_state["dashboard_liberado"] = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta.")
+    st.stop()
+
+
+exigir_acesso()
 
 INTERVALO_MS = 2000
 
@@ -73,6 +110,12 @@ def carregar_registros():
         # continua sendo concluída (ou recebida). Arquivar só a tira da
         # vista do dia a dia, sem apagar nada.
         r.setdefault("arquivada", False)
+        # Registros da Fase 2 não guardavam o hash da transação de registro.
+        # Nesses casos "onchain" fica indefinido: não dá para afirmar nem
+        # negar que existe prova pública, então o dashboard não inventa uma.
+        r.setdefault("tx_registro", "")
+        if "onchain" not in r:
+            r["onchain"] = bool(r.get("tx_registro"))
     return linhas
 
 
@@ -142,10 +185,11 @@ if pendente:
         except Exception as e:
             st.session_state["conclusao_resultado"] = ("erro", str(e))
 
-    # Sinaliza a antena (nunca trava se ela não estiver conectada).
-    # Na nuvem a antena nunca responde, e isso é esperado: o LED só funciona
-    # quando o app roda no notebook ligado por USB à ESP32.
-    enviar_sinal("CONCLUIDA")
+    # A antena NÃO é acionada daqui. Quem a aciona é o vigia_antena.py, que
+    # observa os contratos na blockchain de forma independente. Se o dashboard
+    # também sinalizasse, o LED piscaria duas vezes e, pior, a antena passaria
+    # a confiar no aplicativo em vez de confiar no registro público, que é
+    # exatamente o contrário da tese do projeto.
 
     st.session_state.pop("conclusao_pendente", None)
     st.rerun()
@@ -263,6 +307,22 @@ if registros:
                     f"🔐 Impressão digital da foto: `{r['cid']}` — "
                     f"[abrir a imagem]({link_foto})")
 
+            # Prova pública do registro. Se ela não existe, o dashboard diz
+            # isso com todas as letras: uma ocorrência que ficou só no arquivo
+            # local não tem o valor central que o projeto promete.
+            if r.get("tx_registro"):
+                st.markdown(
+                    f"**Comprovante do registro:** "
+                    f"[abrir no Polygonscan]"
+                    f"(https://amoy.polygonscan.com/tx/{r['tx_registro']})"
+                )
+            elif not str(r.get("id", "")).startswith("legacy-"):
+                st.warning(
+                    "Esta ocorrência não tem prova on-chain: a gravação na "
+                    "blockchain falhou no momento do envio. O registro existe "
+                    "aqui, mas não é auditável publicamente."
+                )
+
             if r.get("token_tx"):
                 st.markdown(
                     f"**Comprovante de conclusão e recompensa:** "
@@ -303,7 +363,6 @@ if registros:
                         else:
                             st.session_state["conclusao_resultado"] = (
                                 "sem_carteira", "")
-                            enviar_sinal("CONCLUIDA")
 
                     st.rerun()
 

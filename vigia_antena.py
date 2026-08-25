@@ -97,9 +97,13 @@ def checar_uma_vez(estado, ler_ocorrencias, ler_tokens, sinalizar, avisar=print)
         avisar(f"   (falha ao ler tokens: {e})")
         total_tokens = None
 
+    # Na primeira verificação ainda não existe contador anterior. Nesse caso o
+    # valor atual vira a linha de base e nada é sinalizado: senão a antena
+    # acenderia no arranque por causa das ocorrências antigas.
     if total_ocorrencias is not None:
-        if total_ocorrencias > estado["ocorrencias"]:
-            quantas = total_ocorrencias - estado["ocorrencias"]
+        anterior = estado.get("ocorrencias", total_ocorrencias)
+        if total_ocorrencias > anterior:
+            quantas = total_ocorrencias - anterior
             avisar(f"📍 NOVA OCORRÊNCIA detectada na blockchain "
                    f"(total: {total_ocorrencias}). Acendendo a antena...")
             for _ in range(quantas):
@@ -107,7 +111,7 @@ def checar_uma_vez(estado, ler_ocorrencias, ler_tokens, sinalizar, avisar=print)
         novo["ocorrencias"] = total_ocorrencias
 
     if total_tokens is not None:
-        if total_tokens > estado["tokens"]:
+        if total_tokens > estado.get("tokens", total_tokens):
             avisar("✅ CONCLUSÃO detectada na blockchain — token CP enviado. "
                    "Acendendo o segundo LED...")
             sinalizar("CONCLUIDA")
