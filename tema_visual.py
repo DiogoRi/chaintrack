@@ -87,9 +87,9 @@ _CSS = """
         color: #FFFFFF;
         border: none;
         border-radius: 10px;
-        padding: 0.7rem 1.6rem;
-        font-weight: 600;
-        font-size: 1.18rem;
+        padding: 0.8rem 1.8rem;
+        font-weight: 650;
+        font-size: 1.35rem;
         text-transform: none;
         letter-spacing: 0;
         box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
@@ -144,8 +144,8 @@ _CSS = """
        quase invisível numa projeção, e essas legendas carregam informação
        que a banca precisa conseguir ler. */
     .stCaption, div[data-testid="stCaptionContainer"] p {
-        color: #5A6775 !important;
-        font-size: 0.94rem !important;
+        color: #46525F !important;
+        font-size: 0.96rem !important;
     }
 
     /* ---------- Rótulos dos campos ---------- */
