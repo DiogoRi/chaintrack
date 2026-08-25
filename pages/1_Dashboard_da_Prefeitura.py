@@ -205,6 +205,8 @@ if registros:
                   f"{r.get('descricao', 'Sem descrição')[:70]}")
         with st.expander(titulo):
             st.write(f"**Nome:** {r.get('nome', 'N/A')}")
+            if r.get("email"):
+                st.write(f"**E-mail:** {r['email']}")
             st.write(f"**Endereço:** {r.get('endereco', 'N/A')}")
             st.write(f"**Descrição:** {r.get('descricao', 'N/A')}")
             st.write(f"**Data:** {r.get('data', 'N/A')}")

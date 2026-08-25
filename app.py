@@ -274,6 +274,13 @@ cep = st.text_input("CEP (pode digitar com ou sem o hífen)",
 
 st.markdown("### Seus dados")
 nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
+email = st.text_input(
+    "E-mail (opcional)", placeholder="maria@email.com")
+st.caption(
+    "Futuramente, será usado para avisar você quando o problema for resolvido "
+    "e para entrarmos em contato, caso precisemos de mais detalhes sobre a "
+    "ocorrência."
+)
 
 st.markdown("### Recompensa (opcional)")
 st.markdown(
@@ -356,6 +363,7 @@ if enviar:
                 partes_endereco.append(f"CEP {cep_formatado}")
             endereco_completo = " - ".join(partes_endereco)
 
+            tx_hash = ""
             try:
                 with st.spinner("Registrando na blockchain..."):
                     tx_hash = registrar_blockchain(
@@ -386,9 +394,13 @@ if enviar:
                 st.info(
                     "📡 Antena não respondeu (ok para testar sem hardware conectado).")
 
+            protocolo = uuid.uuid4().hex[:8].upper()
+            momento = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
             registro = {
-                "id": uuid.uuid4().hex[:8],
+                "id": protocolo.lower(),
                 "nome": nome,
+                "email": email.strip(),
                 "endereco": endereco_completo,
                 "descricao": descricao,
                 "latitude": latitude,
@@ -401,6 +413,22 @@ if enviar:
             }
             with open(REGISTROS_PATH, "a") as f:
                 f.write(json.dumps(registro) + "\n")
+
+            # Guarda o comprovante na memória da sessão em vez de desenhá-lo
+            # aqui dentro. Motivo: o botão de download recarrega a página, e
+            # tudo o que estivesse dentro deste bloco desapareceria justamente
+            # quando a pessoa tentasse baixar o comprovante.
+            st.session_state["comprovante"] = {
+                "protocolo": protocolo,
+                "momento": momento,
+                "nome": nome,
+                "email": email.strip(),
+                "endereco": endereco_completo,
+                "descricao": descricao,
+                "cid": cid,
+                "tx_hash": tx_hash,
+                "wallet": wallet_limpa,
+            }
             st.balloons()
         else:
             st.error("Erro ao enviar para o IPFS. Verifique a chave.")
@@ -417,3 +445,101 @@ if enviar:
         if not descricao:
             faltando.append("a descrição do problema")
         st.warning("Falta preencher: " + ", ".join(faltando) + ".")
+
+
+# ===========================================================================
+# COMPROVANTE
+#
+# Fica FORA do bloco do botão de propósito. O botão de download recarrega a
+# página; se o comprovante fosse desenhado dentro do "if enviar", ele sumiria
+# no exato momento em que a pessoa tentasse baixá-lo. Guardado em
+# st.session_state, ele sobrevive a essas recargas.
+# ===========================================================================
+comprovante = st.session_state.get("comprovante")
+
+if comprovante:
+    st.markdown("---")
+    st.markdown("## ✅ Comprovante da sua ocorrência")
+    st.markdown(
+        "**Obrigado por ser um cidadão participativo e contribuir para uma "
+        "cidade melhor.** Guarde este comprovante: ele reúne os links que "
+        "comprovam o seu registro."
+    )
+
+    link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
+    link_tx = (f"https://amoy.polygonscan.com/tx/{comprovante['tx_hash']}"
+               if comprovante["tx_hash"] else "")
+
+    with st.container(border=True):
+        col_dados, col_foto = st.columns([2, 1])
+
+        with col_dados:
+            st.markdown(f"**Protocolo:** `{comprovante['protocolo']}`")
+            st.markdown(f"**Registrado em:** {comprovante['momento']}")
+            st.markdown(f"**Nome:** {comprovante['nome']}")
+            if comprovante["email"]:
+                st.markdown(f"**E-mail:** {comprovante['email']}")
+            st.markdown(f"**Endereço:** {comprovante['endereco']}")
+            st.markdown(f"**Ocorrência:** {comprovante['descricao']}")
+            if comprovante["wallet"]:
+                st.markdown(
+                    f"**Carteira para a recompensa:** `{comprovante['wallet']}`")
+
+        with col_foto:
+            st.image(link_foto, width=220)
+            st.markdown(f"[📷 Abrir ou salvar a foto]({link_foto})")
+
+        st.markdown("**Comprovações permanentes:**")
+        if link_tx:
+            st.markdown(f"⛓️ [Registro na blockchain]({link_tx})")
+        else:
+            st.markdown(
+                "⛓️ _O registro na blockchain não foi concluído nesta tentativa._")
+        st.markdown(f"🔐 [Foto no IPFS]({link_foto})")
+
+    # Versão em texto, para a pessoa levar consigo.
+    linhas_texto = [
+        "COMPROVANTE DE OCORRÊNCIA — DePIN URBANO",
+        "=" * 46,
+        "",
+        f"Protocolo:     {comprovante['protocolo']}",
+        f"Registrado em: {comprovante['momento']}",
+        "",
+        f"Nome:          {comprovante['nome']}",
+    ]
+    if comprovante["email"]:
+        linhas_texto.append(f"E-mail:        {comprovante['email']}")
+    linhas_texto += [
+        f"Endereço:      {comprovante['endereco']}",
+        "",
+        "Ocorrência:",
+        f"  {comprovante['descricao']}",
+        "",
+    ]
+    if comprovante["wallet"]:
+        linhas_texto += [
+            f"Carteira para a recompensa: {comprovante['wallet']}", ""]
+    linhas_texto += [
+        "COMPROVAÇÕES PERMANENTES",
+        "-" * 46,
+        f"Registro na blockchain: {link_tx or 'não concluído'}",
+        f"Foto no IPFS:           {link_foto}",
+        f"Impressão digital:      {comprovante['cid']}",
+        "",
+        "Obrigado por ser um cidadão participativo e contribuir",
+        "para uma cidade melhor.",
+    ]
+
+    col_baixar, col_novo = st.columns(2)
+    with col_baixar:
+        st.download_button(
+            "⬇️ Baixar comprovante",
+            data="\n".join(linhas_texto).encode("utf-8"),
+            file_name=f"comprovante_{comprovante['protocolo']}.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+    with col_novo:
+        if st.button("Registrar outra ocorrência", use_container_width=True):
+            st.session_state.pop("comprovante", None)
+            st.rerun()
