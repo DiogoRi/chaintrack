@@ -69,7 +69,28 @@ def carregar_registros():
         r.setdefault("status", "recebida")
         r.setdefault("wallet", "")
         r.setdefault("token_tx", "")
+        # "arquivada" é independente do status: uma ocorrência arquivada
+        # continua sendo concluída (ou recebida). Arquivar só a tira da
+        # vista do dia a dia, sem apagar nada.
+        r.setdefault("arquivada", False)
     return linhas
+
+
+def ordenar_por_data(lista):
+    """Mais recentes primeiro. A data é gravada como 'AAAA-MM-DD HH:MM:SS',
+    formato em que a ordem alfabética coincide com a cronológica."""
+    return sorted(lista, key=lambda r: str(r.get("data", "")), reverse=True)
+
+
+def data_curta(r):
+    """Converte '2026-08-22 21:25:12' em '22/08/2026 21:25'."""
+    bruta = str(r.get("data", ""))
+    try:
+        d, h = bruta.split(" ")
+        ano, mes, dia = d.split("-")
+        return f"{dia}/{mes}/{ano} {h[:5]}"
+    except Exception:
+        return bruta or "sem data"
 
 
 def salvar_registros(registros):
@@ -197,13 +218,33 @@ if registros:
         "da antena."
     )
 
+    def protocolo_de(r):
+        """Número de protocolo exibido na lista.
+
+        Os registros feitos a partir de agora já nascem com um id curto que
+        serve de protocolo. Os herdados da Fase 2 não tinham isso, e recebem
+        um rótulo próprio para não aparecerem como 'LEGACY-3' na tela.
+        """
+        ident = str(r.get("id", ""))
+        if ident.startswith("legacy-"):
+            return f"FASE2-{ident.split('-')[-1].zfill(2)}"
+        return ident.upper()
+
     def mostrar_ocorrencia(r):
-        """Desenha o cartão de uma ocorrência, com os detalhes e o controle
-        de status. Separado numa função porque agora é usado nas duas abas."""
+        """Desenha o cartão de uma ocorrência, com os detalhes e os controles
+        de status e exclusão. Usado pelas três abas."""
         status_atual = r.get("status", "recebida")
-        titulo = (f"{STATUS_LABELS.get(status_atual, status_atual)} — "
-                  f"{r.get('descricao', 'Sem descrição')[:70]}")
+        # Protocolo e data vêm primeiro: identificam a ocorrência sem
+        # ambiguidade. A descrição entra encurtada, só como pista — assim
+        # todas as linhas ficam com a mesma altura, em vez de umas com uma
+        # linha e outras com quatro.
+        desc = r.get("descricao", "Sem descrição")
+        if len(desc) > 60:
+            desc = desc[:60].rstrip() + "…"
+        titulo = (f"{STATUS_LABELS.get(status_atual, status_atual)}  "
+                  f"{protocolo_de(r)}  ·  {data_curta(r)}  ·  {desc}")
         with st.expander(titulo):
+            st.write(f"**Protocolo:** `{protocolo_de(r)}`")
             st.write(f"**Nome:** {r.get('nome', 'N/A')}")
             if r.get("email"):
                 st.write(f"**E-mail:** {r['email']}")
@@ -266,24 +307,56 @@ if registros:
 
                     st.rerun()
 
-    # Separa em dois grupos. "Em aberto" reúne o que ainda demanda ação da
-    # prefeitura (recebida + em andamento); "concluídas" é o histórico.
-    # Usamos abas em vez de expansores porque o Streamlit não permite um
-    # expansor dentro de outro — e cada ocorrência já é um expansor.
-    abertas = [r for r in registros if r.get("status") != "concluida"]
-    concluidas = [r for r in registros if r.get("status") == "concluida"]
+            # ---- Arquivar / restaurar ----
+            # Arquivar em vez de excluir: nada é apagado, a ocorrência apenas
+            # sai da vista do dia a dia. Isso é coerente com o próprio projeto,
+            # em que o registro na blockchain é permanente por definição.
+            st.markdown("")
+            if r.get("arquivada"):
+                if st.button("↩️ Restaurar", key=f"rest_{r['id']}"):
+                    r["arquivada"] = False
+                    salvar_registros(registros)
+                    st.rerun()
+            else:
+                if st.button("🗂️ Arquivar", key=f"arq_{r['id']}"):
+                    r["arquivada"] = True
+                    salvar_registros(registros)
+                    st.rerun()
 
-    aba_abertas, aba_concluidas = st.tabs([
-        f"🔵 Ocorrências em aberto ({len(abertas)})",
-        f"🟢 Ocorrências concluídas ({len(concluidas)})",
+    # Uma aba para cada status, nas mesmas cores dos pinos do mapa.
+    # Usamos abas em vez de expansores porque o Streamlit não permite um
+    # expansor dentro de outro, e cada ocorrência já é um expansor.
+    ativas = [r for r in registros if not r.get("arquivada")]
+
+    recebidas = ordenar_por_data(
+        [r for r in ativas if r.get("status", "recebida") == "recebida"])
+    em_andamento = ordenar_por_data(
+        [r for r in ativas if r.get("status") == "em_andamento"])
+    concluidas = ordenar_por_data(
+        [r for r in ativas if r.get("status") == "concluida"])
+    arquivadas = ordenar_por_data(
+        [r for r in registros if r.get("arquivada")])
+
+    aba_recebidas, aba_andamento, aba_concluidas, aba_arquivadas = st.tabs([
+        f"🔴 Recebidas ({len(recebidas)})",
+        f"🟠 Em andamento ({len(em_andamento)})",
+        f"🟢 Concluídas ({len(concluidas)})",
+        f"🗂️ Arquivadas ({len(arquivadas)})",
     ])
 
-    with aba_abertas:
-        if abertas:
-            for r in abertas:
+    with aba_recebidas:
+        if recebidas:
+            for r in recebidas:
                 mostrar_ocorrencia(r)
         else:
-            st.success("Nenhuma ocorrência em aberto — tudo resolvido! 🎉")
+            st.success("Nenhuma ocorrência aguardando atendimento.")
+
+    with aba_andamento:
+        if em_andamento:
+            for r in em_andamento:
+                mostrar_ocorrencia(r)
+        else:
+            st.info("Nenhuma ocorrência em andamento no momento.")
 
     with aba_concluidas:
         if concluidas:
@@ -291,6 +364,21 @@ if registros:
                 mostrar_ocorrencia(r)
         else:
             st.info("Nenhuma ocorrência concluída ainda.")
+
+    with aba_arquivadas:
+        st.markdown(
+            "Ocorrências já atendidas saem das abas do dia a dia e ficam "
+            "guardadas aqui, mantendo o histórico do que a cidade resolveu. "
+            "**Nada é apagado:** o registro de cada uma continua público e "
+            "permanente na blockchain, e qualquer ocorrência pode ser "
+            "restaurada a qualquer momento."
+        )
+        st.markdown("")
+        if arquivadas:
+            for r in arquivadas:
+                mostrar_ocorrencia(r)
+        else:
+            st.info("Nenhuma ocorrência arquivada ainda.")
 else:
     st.warning(
         "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")
