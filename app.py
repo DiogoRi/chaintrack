@@ -303,6 +303,10 @@ if st.button("Enviar ocorrência"):
         if cid:
             st.success("✅ Imagem salva no IPFS!")
             st.code(f"CID: {cid}")
+            st.caption(
+                "🔐 **É a impressão digital da sua foto.** "
+                "Se alguém trocar a imagem, este código muda e a troca aparece."
+            )
 
             logradouro = f"{tipo_logradouro} {via}".strip()
             cep_formatado = formatar_cep(cep)
@@ -349,7 +353,11 @@ if st.button("Enviar ocorrência"):
                 if recibo.status == 1:
                     st.success("✅ Registrado na blockchain!")
                     st.markdown(
-                        f"🔗 [Ver no PolygonScan](https://amoy.polygonscan.com/tx/{tx_hash})")
+                        f"🔗 [Ver o registro no PolygonScan](https://amoy.polygonscan.com/tx/{tx_hash})")
+                    st.caption(
+                        "⛓️ **Ninguém pode apagar ou alterar esta ocorrência.** "
+                        "O link é a sua prova, com data e hora."
+                    )
                 else:
                     st.error(
                         "❌ A transação foi minerada mas reverteu (status 0). "

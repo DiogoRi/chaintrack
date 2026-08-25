@@ -211,13 +211,17 @@ if registros:
                 # demora ou não responde, e nesse caso a imagem acima não
                 # carrega. Com o link, a foto continua acessível.
                 st.caption(
-                    f"Impressão digital da foto (CID): `{r['cid']}` — "
+                    f"🔐 Impressão digital da foto: `{r['cid']}` — "
                     f"[abrir a imagem]({link_foto})")
 
             if r.get("token_tx"):
                 st.markdown(
                     f"**Comprovante de conclusão e recompensa:** "
                     f"[abrir no Polygonscan](https://amoy.polygonscan.com/tx/{r['token_tx']})"
+                )
+                st.caption(
+                    "⛓️ A conclusão e o envio do token saíram na mesma operação — "
+                    "uma não existe sem a outra."
                 )
 
             col1, col2 = st.columns([3, 1])
