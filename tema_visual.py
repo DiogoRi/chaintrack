@@ -87,9 +87,11 @@ _CSS = """
         color: #FFFFFF;
         border: none;
         border-radius: 10px;
-        padding: 0.6rem 1.6rem;
+        padding: 0.7rem 1.6rem;
         font-weight: 600;
-        font-size: 1.02rem;
+        font-size: 1.18rem;
+        text-transform: none;
+        letter-spacing: 0;
         box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
         transition: background 0.15s ease, transform 0.15s ease;
     }
@@ -137,9 +139,13 @@ _CSS = """
         border: none;
     }
 
-    /* ---------- Legendas ---------- */
+    /* ---------- Legendas ----------
+       Escurecidas em relação ao padrão do Streamlit: o cinza claro fica
+       quase invisível numa projeção, e essas legendas carregam informação
+       que a banca precisa conseguir ler. */
     .stCaption, div[data-testid="stCaptionContainer"] p {
-        color: #7A8794 !important;
+        color: #5A6775 !important;
+        font-size: 0.94rem !important;
     }
 
     /* ---------- Rótulos dos campos ---------- */

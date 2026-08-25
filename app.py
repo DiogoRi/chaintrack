@@ -279,7 +279,7 @@ st.markdown("### Recompensa (opcional)")
 st.markdown(
     "Copie o endereço da sua carteira digital e cole abaixo. "
     "Quando o problema for resolvido e atualizado no sistema, você receberá "
-    "tokens **CP (Cidadão Participativo)** — que poderão ser usados em "
+    "tokens **CP (Cidadão Participativo)**, que poderão ser usados em "
     "serviços e benefícios municipais."
 )
 wallet = st.text_input(
@@ -287,8 +287,8 @@ wallet = st.text_input(
     placeholder="0x0000000000000000000000000000000000000000",
 )
 st.caption(
-    "Não tem carteira ou prefere não informar? Deixe em branco — "
-    "a ocorrência é registrada do mesmo jeito."
+    "Não tem carteira ou prefere não informar? Deixe em branco. "
+    "A ocorrência é registrada do mesmo jeito."
 )
 
 st.markdown("")  # respiro antes do botão
