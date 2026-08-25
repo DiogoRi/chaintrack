@@ -252,6 +252,42 @@ _CSS = """
         font-size: 0.96rem !important;
     }
 
+    /* ---------- Celular ----------
+       Duas correções que só aparecem em telas estreitas:
+
+       1. Os títulos grandes, pensados para projeção, não cabem numa linha
+          e quebram em lugares esquisitos. O clamp() faz o tamanho
+          acompanhar a largura da tela, entre um minimo e o valor cheio.
+       2. O conteúdo encosta na borda esquerda, o que dá a impressão de
+          texto desalinhado. Uma margem igual dos dois lados resolve. */
+    @media (max-width: 640px) {
+        .block-container {
+            padding-left: 1.1rem !important;
+            padding-right: 1.1rem !important;
+            padding-top: 2.6rem !important;
+        }
+        h1 { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
+        h2 { font-size: clamp(1.35rem, 6vw, 1.9rem) !important; }
+        h3 { font-size: clamp(1.1rem, 5vw, 1.35rem) !important; }
+        .titulo-dashboard { font-size: clamp(1.8rem, 8.5vw, 3.2rem) !important; }
+        .subtitulo-dashboard { font-size: clamp(1.3rem, 6vw, 2.2rem) !important; }
+        .titulo-sobre { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
+        .subtitulo-sobre { font-size: clamp(1.05rem, 4.6vw, 1.4rem) !important; }
+        .frase-impacto { font-size: clamp(1.05rem, 4.6vw, 1.45rem) !important; }
+        .stButton > button { font-size: 1.2rem; padding: 0.8rem 1.2rem; }
+    }
+
+    /* Títulos das páginas: mesma margem esquerda do texto que vem depois.
+       Sem isto, um título dentro de <p> e um título em <h1> começam em
+       pontos ligeiramente diferentes, e a coluna parece torta. */
+    .titulo-sobre, .subtitulo-sobre, .titulo-dashboard,
+    .subtitulo-dashboard, .frase-impacto {
+        padding-left: 0 !important;
+        margin-left: 0 !important;
+        max-width: 100%;
+        overflow-wrap: break-word;
+    }
+
     /* ---------- Rótulos dos campos ---------- */
     label p {
         font-weight: 600 !important;

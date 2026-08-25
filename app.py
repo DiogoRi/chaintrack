@@ -227,39 +227,45 @@ ESTADOS = [
     "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ]
 
-st.markdown("### Foto do problema")
+st.markdown("### Foto da ocorrência")
 
 # A câmera só liga quando a pessoa pede. Antes, o app abria já com a câmera
-# em funcionamento e a imagem da pessoa na tela, o que é invasivo e assusta
-# quem só queria olhar o formulário. Agora o padrão é escolher um arquivo, e
-# quem quiser fotografar na hora aperta o botão.
+# em funcionamento e a imagem de quem estava na frente do celular na tela, o
+# que é invasivo e assusta quem só queria olhar o formulário.
+#
+# A ordem dos dois caminhos também importa: fotografar na hora é o que a
+# maioria vai fazer, então esse botão vem primeiro, logo abaixo do título.
+# Escolher um arquivo é a alternativa, e por isso vem depois.
 if "camera_ligada" not in st.session_state:
     st.session_state["camera_ligada"] = False
 
 foto = None
 
 if st.session_state["camera_ligada"]:
-    foto = st.camera_input("Enquadre o problema e toque em Take Photo")
+    foto = st.camera_input("Enquadre a ocorrência e toque em Take Photo")
     if st.button("✖️ Desligar a câmera"):
         st.session_state["camera_ligada"] = False
         st.rerun()
 else:
-    foto = st.file_uploader(
-        "📁 Escolha uma foto do seu celular ou computador",
-        type=["jpg", "jpeg", "png"])
-    st.caption("A foto é o que comprova a ocorrência. Ela vai para o IPFS e "
-               "ganha um código próprio, calculado a partir da própria imagem.")
-    if st.button("📷 Ou tire uma foto agora"):
+    if st.button("📷 Tirar uma foto agora"):
         st.session_state["camera_ligada"] = True
         st.rerun()
 
+    st.markdown("")
+    foto = st.file_uploader(
+        "Ou escolha uma foto da galeria do seu celular ou computador",
+        type=["jpg", "jpeg", "png"])
+
+st.caption("A foto é o que comprova a ocorrência. Ela vai para o IPFS e ganha "
+           "um código próprio, calculado a partir da própria imagem.")
+
 st.markdown("### O que está acontecendo?")
 descricao = st.text_area(
-    "Descreva o problema",
+    "Descreva a ocorrência",
     placeholder="Ex.: Buraco na calçada em frente ao número 120, "
                 "com risco de queda para pedestres.")
 
-st.markdown("### Onde está o problema?")
+st.markdown("### Onde fica a ocorrência?")
 
 # Tipo e nome do logradouro lado a lado: além de encurtar a página no celular,
 # informar "Avenida" ou "Rua" melhora muito o acerto da busca de coordenadas —
@@ -294,7 +300,7 @@ nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
 email = st.text_input(
     "E-mail (opcional)", placeholder="maria@email.com")
 st.caption(
-    "Futuramente, será usado para avisar você quando o problema for resolvido "
+    "Futuramente, será usado para avisar você quando a ocorrência for atendida "
     "e para entrarmos em contato, caso precisemos de mais detalhes sobre a "
     "ocorrência."
 )
@@ -302,7 +308,7 @@ st.caption(
 st.markdown("### Recompensa (opcional)")
 st.markdown(
     "Copie o endereço da sua carteira digital e cole abaixo. "
-    "Quando o problema for resolvido e atualizado no sistema, você receberá "
+    "Quando a ocorrência for atendida e atualizada no sistema, você receberá "
     "tokens **CP (Cidadão Participativo)**, que poderão ser usados em "
     "serviços e benefícios municipais."
 )
@@ -487,7 +493,7 @@ if enviar:
         if not cidade:
             faltando.append("a cidade")
         if not descricao:
-            faltando.append("a descrição do problema")
+            faltando.append("a descrição da ocorrência")
         st.warning("Falta preencher: " + ", ".join(faltando) + ".")
 
 
