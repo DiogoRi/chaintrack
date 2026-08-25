@@ -233,7 +233,7 @@ ESTADOS = [
 # na galeria, ou para quem preferir escolher um arquivo.
 foto = st.camera_input(
     "📷 Tire uma foto que identifique o problema") or st.file_uploader(
-    "📁 Ou envie uma foto que já está no seu aparelho",
+    "📁 Ou escolha uma foto do seu celular",
     type=["jpg", "jpeg", "png"])
 
 st.markdown("### O que está acontecendo?")
