@@ -227,13 +227,31 @@ ESTADOS = [
     "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ]
 
-# A câmera nativa funciona no celular porque o app é servido por https.
-# O campo de envio abaixo continua existindo para quem já tem a foto salva
-# na galeria, ou para quem preferir escolher um arquivo.
-foto = st.camera_input(
-    "📷 Tire uma foto que identifique o problema") or st.file_uploader(
-    "📁 Ou escolha uma foto do seu celular",
-    type=["jpg", "jpeg", "png"])
+st.markdown("### Foto do problema")
+
+# A câmera só liga quando a pessoa pede. Antes, o app abria já com a câmera
+# em funcionamento e a imagem da pessoa na tela, o que é invasivo e assusta
+# quem só queria olhar o formulário. Agora o padrão é escolher um arquivo, e
+# quem quiser fotografar na hora aperta o botão.
+if "camera_ligada" not in st.session_state:
+    st.session_state["camera_ligada"] = False
+
+foto = None
+
+if st.session_state["camera_ligada"]:
+    foto = st.camera_input("Enquadre o problema e toque em Take Photo")
+    if st.button("✖️ Desligar a câmera"):
+        st.session_state["camera_ligada"] = False
+        st.rerun()
+else:
+    foto = st.file_uploader(
+        "📁 Escolha uma foto do seu celular ou computador",
+        type=["jpg", "jpeg", "png"])
+    st.caption("A foto é o que comprova a ocorrência. Ela vai para o IPFS e "
+               "ganha um código próprio, calculado a partir da própria imagem.")
+    if st.button("📷 Ou tire uma foto agora"):
+        st.session_state["camera_ligada"] = True
+        st.rerun()
 
 st.markdown("### O que está acontecendo?")
 descricao = st.text_area(
@@ -447,6 +465,15 @@ if enviar:
                 "wallet": wallet_limpa,
             }
             st.balloons()
+            # A pessoa acabou de enviar e a tela dela está no meio do
+            # formulário. Sem este aviso ela não descobre que o comprovante
+            # foi gerado mais abaixo, e sai da página sem baixá-lo.
+            st.success(
+                "✅ **Pronto! Sua ocorrência foi registrada.**\n\n"
+                "⬇️ **Role a tela para baixo** para ver o seu comprovante e "
+                "baixar o arquivo. Guarde o número de protocolo: é com ele "
+                "que você acompanha o atendimento."
+            )
         else:
             st.error("Erro ao enviar para o IPFS. Verifique a chave.")
     elif wallet_ok:
@@ -492,33 +519,6 @@ if comprovante:
     link_tx = (f"https://amoy.polygonscan.com/tx/{comprovante['tx_hash']}"
                if comprovante["tx_hash"] else "")
 
-    with st.container(border=True):
-        col_dados, col_foto = st.columns([2, 1])
-
-        with col_dados:
-            st.markdown(f"**Protocolo:** `{comprovante['protocolo']}`")
-            st.markdown(f"**Registrado em:** {comprovante['momento']}")
-            st.markdown(f"**Nome:** {comprovante['nome']}")
-            if comprovante["email"]:
-                st.markdown(f"**E-mail:** {comprovante['email']}")
-            st.markdown(f"**Endereço:** {comprovante['endereco']}")
-            st.markdown(f"**Ocorrência:** {comprovante['descricao']}")
-            if comprovante["wallet"]:
-                st.markdown(
-                    f"**Carteira para a recompensa:** `{comprovante['wallet']}`")
-
-        with col_foto:
-            st.image(link_foto, width=220)
-            st.markdown(f"[📷 Abrir ou salvar a foto]({link_foto})")
-
-        st.markdown("**Comprovações permanentes:**")
-        if link_tx:
-            st.markdown(f"⛓️ [Registro na blockchain]({link_tx})")
-        else:
-            st.markdown(
-                "⛓️ _O registro na blockchain não foi concluído nesta tentativa._")
-        st.markdown(f"🔐 [Foto no IPFS]({link_foto})")
-
     # Versão em texto, para a pessoa levar consigo.
     linhas_texto = [
         "COMPROVANTE DE OCORRÊNCIA — DePIN URBANO",
@@ -558,6 +558,50 @@ if comprovante:
         "para uma cidade melhor.",
     ]
 
+
+    # O botão de baixar aparece duas vezes de propósito: aqui em cima, onde a
+    # pessoa chega, e de novo no fim do comprovante. Antes ele existia só no
+    # rodapé, e quem não rolava a tela inteira ia embora sem o arquivo.
+    st.download_button(
+        "⬇️  Baixar o meu comprovante",
+        data="\n".join(linhas_texto).encode("utf-8"),
+        file_name=f"comprovante_{comprovante['protocolo']}.txt",
+        mime="text/plain",
+        use_container_width=True,
+        key="baixar_topo",
+    )
+    st.caption("O arquivo é um texto simples, que abre em qualquer celular ou "
+               "computador e pode ser guardado ou encaminhado.")
+
+    st.markdown("")
+
+    with st.container(border=True):
+        col_dados, col_foto = st.columns([2, 1])
+
+        with col_dados:
+            st.markdown(f"**Protocolo:** `{comprovante['protocolo']}`")
+            st.markdown(f"**Registrado em:** {comprovante['momento']}")
+            st.markdown(f"**Nome:** {comprovante['nome']}")
+            if comprovante["email"]:
+                st.markdown(f"**E-mail:** {comprovante['email']}")
+            st.markdown(f"**Endereço:** {comprovante['endereco']}")
+            st.markdown(f"**Ocorrência:** {comprovante['descricao']}")
+            if comprovante["wallet"]:
+                st.markdown(
+                    f"**Carteira para a recompensa:** `{comprovante['wallet']}`")
+
+        with col_foto:
+            st.image(link_foto, width=220)
+            st.markdown(f"[📷 Abrir ou salvar a foto]({link_foto})")
+
+        st.markdown("**Comprovações permanentes:**")
+        if link_tx:
+            st.markdown(f"⛓️ [Registro na blockchain]({link_tx})")
+        else:
+            st.markdown(
+                "⛓️ _O registro na blockchain não foi concluído nesta tentativa._")
+        st.markdown(f"🔐 [Foto no IPFS]({link_foto})")
+
     col_baixar, col_novo = st.columns(2)
     with col_baixar:
         st.download_button(
@@ -566,6 +610,7 @@ if comprovante:
             file_name=f"comprovante_{comprovante['protocolo']}.txt",
             mime="text/plain",
             use_container_width=True,
+            key="baixar_rodape",
         )
     with col_novo:
         if st.button("Registrar outra ocorrência", use_container_width=True):

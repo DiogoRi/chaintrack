@@ -158,6 +158,59 @@ _CSS = """
         font-style: italic;
     }
 
+    /* ---------- Listas suspensas e campos numéricos ----------
+       O padrão do Streamlit desenha esses campos quase sem contorno, e num
+       fundo claro eles somem: a pessoa não percebe que ali tem algo para
+       clicar. Como são justamente os controles que movimentam o atendimento
+       (situação, equipe responsável, prazo), eles ganham a mesma borda dos
+       campos de texto e o cursor de mão, que sinaliza "isto é clicável". */
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        border: 1px solid #C3D0E0 !important;
+        border-radius: 8px !important;
+        cursor: pointer;
+        min-height: 44px;
+    }
+    div[data-baseweb="select"] > div:hover {
+        border-color: #5B8FB9 !important;
+        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.12) !important;
+    }
+    div[data-baseweb="select"] svg {
+        color: #5B8FB9 !important;
+    }
+
+    .stNumberInput div[data-baseweb="input"] {
+        background-color: #FFFFFF !important;
+        border: 1px solid #C3D0E0 !important;
+        border-radius: 8px !important;
+    }
+    .stNumberInput div[data-baseweb="input"]:hover {
+        border-color: #5B8FB9 !important;
+    }
+    .stNumberInput input {
+        background-color: #FFFFFF !important;
+        color: #33404D !important;
+    }
+    /* Os botõezinhos de mais e menos do campo numérico */
+    .stNumberInput button {
+        background-color: #EEF4FA !important;
+        border-left: 1px solid #C3D0E0 !important;
+        cursor: pointer;
+    }
+    .stNumberInput button:hover {
+        background-color: #DCE8F4 !important;
+    }
+
+    /* Área de envio de arquivo: mesma lógica, precisa parecer clicável. */
+    section[data-testid="stFileUploaderDropzone"] {
+        background-color: #FFFFFF !important;
+        border: 1px dashed #C3D0E0 !important;
+        border-radius: 10px !important;
+    }
+    section[data-testid="stFileUploaderDropzone"]:hover {
+        border-color: #5B8FB9 !important;
+    }
+
     /* ---------- Lista de grupos do dashboard ----------
        O seletor de grupos (Recebidas / Em andamento / Concluídas /
        Arquivadas) aparece empilhado. Aumentamos a fonte e o espaçamento
