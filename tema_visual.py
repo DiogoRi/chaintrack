@@ -51,6 +51,25 @@ _CSS = """
         margin-top: 1.6rem !important;
     }
 
+    /* ---------- Títulos do dashboard ----------
+       Têm tamanho próprio, maior que o do formulário: o dashboard é a tela
+       projetada para a plateia, enquanto o formulário é lido de perto, na
+       mão de quem registra. */
+    .titulo-dashboard {
+        font-size: 3.2rem !important;
+        font-weight: 700 !important;
+        color: #3D6E94 !important;
+        letter-spacing: -1px;
+        margin: 0 0 0.6rem 0 !important;
+        line-height: 1.1;
+    }
+    .subtitulo-dashboard {
+        font-size: 2.2rem !important;
+        font-weight: 600 !important;
+        color: #3D6E94 !important;
+        margin: 0.4rem 0 0.6rem 0 !important;
+    }
+
     /* ---------- Frase de impacto ----------
        Fica entre o título e o subtítulo. Tamanho intermediário de propósito:
        maior que o texto comum, para ser lida de longe numa projeção, mas

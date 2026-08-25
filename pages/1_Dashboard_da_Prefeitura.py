@@ -98,7 +98,8 @@ pendente = st.session_state.get("conclusao_pendente")
 if not pendente:
     st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
 
-st.title("🗺️ Dashboard DePIN Urbano")
+st.markdown(
+    "<p class='titulo-dashboard'>🗺️ Dashboard</p>", unsafe_allow_html=True)
 
 if pendente:
     alvo = next((r for r in registros if r.get("id") == pendente), None)
@@ -148,7 +149,9 @@ if resultado:
             "**Concluída** e clique em **Atualizar** de novo para tentar outra vez."
         )
 
-st.subheader("Ocorrências registradas")
+st.markdown(
+    "<p class='subtitulo-dashboard'>Ocorrências registradas</p>",
+    unsafe_allow_html=True)
 
 if registros:
     st.write(f"**{len(registros)} ocorrência(s) registrada(s)**")
@@ -184,11 +187,14 @@ if registros:
     st_folium(mapa, width=900, height=500, key="mapa_depin")
 
     st.markdown("### Ocorrências e status")
-    st.caption(
+    # Texto normal em vez de legenda: esta instrução é operacional (explica o
+    # que acontece ao concluir) e precisa ser lida sem esforço na projeção.
+    st.markdown(
         "Atualize o status manualmente conforme o andamento. Ao marcar como "
         "**Concluída**, se a ocorrência tiver uma carteira informada, sai uma "
-        "transação na blockchain que registra a conclusão E envia o token "
-        "CP (Cidadão Participativo), tudo de uma vez — além de acionar o sinal da antena."
+        "transação na blockchain que registra a conclusão e envia o token "
+        "CP (Cidadão Participativo), tudo de uma vez, além de acionar o sinal "
+        "da antena."
     )
 
     def mostrar_ocorrencia(r):
