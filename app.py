@@ -210,6 +210,11 @@ st.set_page_config(
 )
 aplicar_tema()
 st.title("📡 DePIN Urbano")
+st.markdown(
+    "<p class='frase-impacto'>Seja um cidadão participativo e ajude a "
+    "construir uma cidade melhor</p>",
+    unsafe_allow_html=True,
+)
 st.subheader("Registre uma ocorrência")
 
 TIPOS_LOGRADOURO = [
@@ -223,19 +228,21 @@ ESTADOS = [
     "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ]
 
-# A câmera nativa (st.camera_input) só é liberada pelo navegador em páginas
-# https:// ou em localhost. Acessando pelo celular via IP da rede local
-# (http://192.168.x.x), o navegador bloqueia — por isso o campo de upload
-# abaixo é o caminho principal no celular: no iOS ele abre o menu com
-# "Tirar Foto ou Vídeo", ou seja, a foto continua sendo tirada na hora.
-foto = st.camera_input("📷 Tirar foto agora (só funciona no notebook)") or st.file_uploader(
-    "📱 Pelo celular: toque aqui e escolha 'Tirar Foto ou Vídeo'",
+# A câmera nativa funciona no celular porque o app é servido por https.
+# O campo de envio abaixo continua existindo para quem já tem a foto salva
+# na galeria, ou para quem preferir escolher um arquivo.
+foto = st.camera_input(
+    "📷 Tire uma foto que identifique o problema") or st.file_uploader(
+    "📁 Ou envie uma foto que já está no seu aparelho",
     type=["jpg", "jpeg", "png"])
 
-st.markdown("### Seus dados")
-nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
+st.markdown("### O que está acontecendo?")
+descricao = st.text_area(
+    "Descreva o problema",
+    placeholder="Ex.: Buraco na calçada em frente ao número 120, "
+                "com risco de queda para pedestres.")
 
-st.markdown("### Endereço do problema")
+st.markdown("### Onde está o problema?")
 
 # Tipo e nome do logradouro lado a lado: além de encurtar a página no celular,
 # informar "Avenida" ou "Rua" melhora muito o acerto da busca de coordenadas —
@@ -262,15 +269,11 @@ with col_cidade:
 with col_estado:
     estado = st.selectbox("Estado", ESTADOS, index=ESTADOS.index("SP"))
 
-cep = st.text_input(
-    "CEP", placeholder="01323-001",
-    help="Pode digitar com ou sem o hífen — o sistema ajusta.")
+cep = st.text_input("CEP (pode digitar com ou sem o hífen)",
+                    placeholder="01323-001")
 
-st.markdown("### O que está acontecendo?")
-descricao = st.text_area(
-    "Descreva o problema",
-    placeholder="Ex.: Buraco na calçada em frente ao número 120, "
-                "com risco de queda para pedestres.")
+st.markdown("### Seus dados")
+nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
 
 st.markdown("### Recompensa (opcional)")
 st.markdown(
@@ -282,11 +285,21 @@ st.markdown(
 wallet = st.text_input(
     "Endereço da carteira",
     placeholder="0x0000000000000000000000000000000000000000",
-    help="Campo opcional. Se você não tiver uma carteira ou preferir não "
-         "informar, deixe em branco — a ocorrência é registrada do mesmo jeito.",
+)
+st.caption(
+    "Não tem carteira ou prefere não informar? Deixe em branco — "
+    "a ocorrência é registrada do mesmo jeito."
 )
 
-if st.button("Enviar ocorrência"):
+st.markdown("")  # respiro antes do botão
+
+# Botão centralizado e largo: no celular fica confortável de acertar com o
+# dedo, e na projeção deixa claro qual é a ação principal da tela.
+_, col_botao, _ = st.columns([1, 2, 1])
+with col_botao:
+    enviar = st.button("Enviar ocorrência", use_container_width=True)
+
+if enviar:
     wallet_limpa = wallet.strip()
     wallet_ok = True
     if wallet_limpa and not wallet_valida(wallet_limpa):

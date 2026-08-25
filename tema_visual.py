@@ -51,6 +51,18 @@ _CSS = """
         margin-top: 1.6rem !important;
     }
 
+    /* ---------- Frase de impacto ----------
+       Fica entre o título e o subtítulo. Tamanho intermediário de propósito:
+       maior que o texto comum, para ser lida de longe numa projeção, mas
+       menor que o título, para não competir com ele. */
+    .frase-impacto {
+        font-size: 1.45rem !important;
+        line-height: 1.35;
+        font-weight: 500;
+        color: #6B8FA8 !important;
+        margin: -0.4rem 0 1.4rem 0 !important;
+    }
+
     /* ---------- Menu lateral (navegação entre as páginas) ----------
        O padrão é discreto demais para usar ao vivo diante de uma banca. */
     section[data-testid="stSidebar"] {
