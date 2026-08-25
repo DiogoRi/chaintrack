@@ -162,42 +162,69 @@ _CSS = """
        O padrão do Streamlit desenha esses campos quase sem contorno, e num
        fundo claro eles somem: a pessoa não percebe que ali tem algo para
        clicar. Como são justamente os controles que movimentam o atendimento
-       (situação, equipe responsável, prazo), eles ganham a mesma borda dos
-       campos de texto e o cursor de mão, que sinaliza "isto é clicável". */
+       (situação, equipe responsável, prazo), eles precisam parecer botões.
+
+       Os seletores são vários de propósito. O Streamlit muda a estrutura
+       interna desses componentes entre versões, e um seletor único que
+       funcionava ontem pode não encontrar nada amanhã. Listando as formas
+       conhecidas, o contorno aparece em qualquer uma delas.  */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"],
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         border: 1px solid #C3D0E0 !important;
-        border-radius: 8px !important;
-        cursor: pointer;
-        min-height: 44px;
+        border-radius: 10px !important;
+        cursor: pointer !important;
     }
-    div[data-baseweb="select"] > div:hover {
+    /* O contorno precisa existir uma vez só. As camadas internas herdam a
+       borda pelos seletores acima; aqui as de dentro voltam a ser lisas,
+       para não desenhar caixa dentro de caixa. */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div {
+        border: none !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div {
+        min-height: 46px;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover {
         border-color: #5B8FB9 !important;
-        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.12) !important;
+        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.16) !important;
     }
     div[data-baseweb="select"] svg {
         color: #5B8FB9 !important;
     }
 
-    .stNumberInput div[data-baseweb="input"] {
+    /* Campo numérico: o contorno vai na caixa inteira, englobando o valor e
+       os botões de mais e menos. Sem isso, os dois botõezinhos parecem
+       soltos na página, sem relação com o número ao lado. */
+    div[data-testid="stNumberInput"] div[data-baseweb="input"],
+    div[data-testid="stNumberInput"] > div > div {
         background-color: #FFFFFF !important;
         border: 1px solid #C3D0E0 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        overflow: hidden;
+        min-height: 46px;
     }
-    .stNumberInput div[data-baseweb="input"]:hover {
+    div[data-testid="stNumberInput"] div[data-baseweb="input"]:hover {
         border-color: #5B8FB9 !important;
+        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.16) !important;
     }
-    .stNumberInput input {
-        background-color: #FFFFFF !important;
+    div[data-testid="stNumberInput"] input {
+        background-color: transparent !important;
         color: #33404D !important;
+        border: none !important;
     }
-    /* Os botõezinhos de mais e menos do campo numérico */
-    .stNumberInput button {
+    div[data-testid="stNumberInput"] button {
         background-color: #EEF4FA !important;
         border-left: 1px solid #C3D0E0 !important;
-        cursor: pointer;
+        cursor: pointer !important;
     }
-    .stNumberInput button:hover {
+    div[data-testid="stNumberInput"] button:hover {
         background-color: #DCE8F4 !important;
     }
 
@@ -206,9 +233,30 @@ _CSS = """
         background-color: #FFFFFF !important;
         border: 1px dashed #C3D0E0 !important;
         border-radius: 10px !important;
+        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.08) !important;
     }
     section[data-testid="stFileUploaderDropzone"]:hover {
         border-color: #5B8FB9 !important;
+    }
+
+    /* Sombra leve em todo botão, inclusive o de baixar o comprovante. */
+    .stDownloadButton > button {
+        background: #5B8FB9;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 10px;
+        font-weight: 650;
+        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
+        transition: background 0.15s ease, box-shadow 0.15s ease,
+                    transform 0.15s ease;
+    }
+    .stDownloadButton > button:hover {
+        background: #4A7FA5;
+        box-shadow: 0 3px 8px rgba(59, 89, 116, 0.24);
+        transform: translateY(-1px);
+    }
+    .stButton > button:hover {
+        box-shadow: 0 3px 8px rgba(59, 89, 116, 0.24);
     }
 
     /* ---------- Lista de grupos do dashboard ----------
@@ -266,14 +314,20 @@ _CSS = """
             padding-right: 1.1rem !important;
             padding-top: 2.6rem !important;
         }
-        h1 { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
-        h2 { font-size: clamp(1.35rem, 6vw, 1.9rem) !important; }
-        h3 { font-size: clamp(1.1rem, 5vw, 1.35rem) !important; }
-        .titulo-dashboard { font-size: clamp(1.8rem, 8.5vw, 3.2rem) !important; }
-        .subtitulo-dashboard { font-size: clamp(1.3rem, 6vw, 2.2rem) !important; }
-        .titulo-sobre { font-size: clamp(1.7rem, 8vw, 2.6rem) !important; }
-        .subtitulo-sobre { font-size: clamp(1.05rem, 4.6vw, 1.4rem) !important; }
-        .frase-impacto { font-size: clamp(1.05rem, 4.6vw, 1.45rem) !important; }
+        h1 { font-size: clamp(1.5rem, 7vw, 2.6rem) !important; }
+        h2 { font-size: clamp(1.25rem, 5.4vw, 1.9rem) !important; }
+        h3 { font-size: clamp(1.05rem, 4.8vw, 1.35rem) !important; }
+
+        /* Os títulos longos das páginas ("Dashboard do Município",
+           "Acompanhar ocorrência") quebravam em duas linhas, e a segunda
+           linha sozinha à esquerda dava a impressão de desalinho. Numa
+           tela estreita eles encolhem o suficiente para caber numa linha
+           só, que é como um título deve se comportar. */
+        .titulo-dashboard { font-size: clamp(1.2rem, 6.2vw, 3.2rem) !important; }
+        .subtitulo-dashboard { font-size: clamp(1.15rem, 5vw, 2.2rem) !important; }
+        .titulo-sobre { font-size: clamp(1.2rem, 6.4vw, 2.6rem) !important; }
+        .subtitulo-sobre { font-size: clamp(1rem, 4.2vw, 1.4rem) !important; }
+        .frase-impacto { font-size: clamp(1rem, 4.4vw, 1.45rem) !important; }
         .stButton > button { font-size: 1.2rem; padding: 0.8rem 1.2rem; }
     }
 
