@@ -1,0 +1,22 @@
+# Tema do Streamlit — DePIN Urbano
+#
+# Definir o tema aqui (e não só por CSS) faz com que os próprios componentes
+# do Streamlit — menus, calendários, o seletor de arquivos — nasçam já com as
+# cores certas. Só CSS não alcança essas partes.
+#
+# Paleta em tons pastéis, clima "serviço público moderno":
+#   fundo   #F5F7FA  cinza-azulado bem claro
+#   cartões #FFFFFF  branco
+#   destaque#5B8FB9  azul suave
+#   texto   #33404D  cinza-azulado escuro (bom contraste, sem ser preto)
+
+[theme]
+base = "light"
+primaryColor = "#5B8FB9"
+backgroundColor = "#F5F7FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#33404D"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

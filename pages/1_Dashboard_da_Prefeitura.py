@@ -191,23 +191,33 @@ if registros:
         "CP (Cidadão Participativo), tudo de uma vez — além de acionar o sinal da antena."
     )
 
-    for i, r in enumerate(registros):
+    def mostrar_ocorrencia(r):
+        """Desenha o cartão de uma ocorrência, com os detalhes e o controle
+        de status. Separado numa função porque agora é usado nas duas abas."""
         status_atual = r.get("status", "recebida")
-        titulo = f"{STATUS_LABELS.get(status_atual, status_atual)} — {r.get('descricao', 'Sem descrição')[:70]}"
+        titulo = (f"{STATUS_LABELS.get(status_atual, status_atual)} — "
+                  f"{r.get('descricao', 'Sem descrição')[:70]}")
         with st.expander(titulo):
             st.write(f"**Nome:** {r.get('nome', 'N/A')}")
             st.write(f"**Endereço:** {r.get('endereco', 'N/A')}")
             st.write(f"**Descrição:** {r.get('descricao', 'N/A')}")
             st.write(f"**Data:** {r.get('data', 'N/A')}")
             st.write(f"**Carteira:** {r.get('wallet') or '_não informada_'}")
+
             if r.get("cid"):
-                st.write(f"**CID:** {r['cid']}")
-                st.image(
-                    f"https://gateway.pinata.cloud/ipfs/{r['cid']}", width=300)
+                link_foto = f"https://gateway.pinata.cloud/ipfs/{r['cid']}"
+                st.image(link_foto, width=300)
+                # O link fica sempre disponível: o gateway do IPFS às vezes
+                # demora ou não responde, e nesse caso a imagem acima não
+                # carrega. Com o link, a foto continua acessível.
+                st.caption(
+                    f"Impressão digital da foto (CID): `{r['cid']}` — "
+                    f"[abrir a imagem]({link_foto})")
+
             if r.get("token_tx"):
-                st.write(
-                    f"**Conclusão + token on-chain:** "
-                    f"[ver transação](https://amoy.polygonscan.com/tx/{r['token_tx']})"
+                st.markdown(
+                    f"**Comprovante de conclusão e recompensa:** "
+                    f"[abrir no Polygonscan](https://amoy.polygonscan.com/tx/{r['token_tx']})"
                 )
 
             col1, col2 = st.columns([3, 1])
@@ -243,6 +253,32 @@ if registros:
                             enviar_sinal("CONCLUIDA")
 
                     st.rerun()
+
+    # Separa em dois grupos. "Em aberto" reúne o que ainda demanda ação da
+    # prefeitura (recebida + em andamento); "concluídas" é o histórico.
+    # Usamos abas em vez de expansores porque o Streamlit não permite um
+    # expansor dentro de outro — e cada ocorrência já é um expansor.
+    abertas = [r for r in registros if r.get("status") != "concluida"]
+    concluidas = [r for r in registros if r.get("status") == "concluida"]
+
+    aba_abertas, aba_concluidas = st.tabs([
+        f"🔵 Ocorrências em aberto ({len(abertas)})",
+        f"🟢 Ocorrências concluídas ({len(concluidas)})",
+    ])
+
+    with aba_abertas:
+        if abertas:
+            for r in abertas:
+                mostrar_ocorrencia(r)
+        else:
+            st.success("Nenhuma ocorrência em aberto — tudo resolvido! 🎉")
+
+    with aba_concluidas:
+        if concluidas:
+            for r in concluidas:
+                mostrar_ocorrencia(r)
+        else:
+            st.info("Nenhuma ocorrência concluída ainda.")
 else:
     st.warning(
         "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")

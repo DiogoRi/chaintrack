@@ -1,79 +1,144 @@
 """
 tema_visual.py — DePIN Urbano
 
-Estilo visual compartilhado entre app.py e dashboard.py: tema escuro com
-azul de destaque, no mesmo clima do vídeo pitch da Fase 2 (visual
-"painel tech / blockchain"). Só CSS por cima do Streamlit — nenhuma
-lógica de negócio muda, nenhuma dependência nova.
+Estilo visual compartilhado entre as duas páginas do app.
+
+A paleta base (fundo, texto, cor de destaque) fica em `.streamlit/config.toml`,
+porque só de lá o Streamlit pinta os próprios componentes internos — menus
+suspensos, o seletor de arquivos, os avisos. O CSS abaixo cuida do resto:
+tamanhos de título, o menu lateral, os cartões das ocorrências e espaçamentos.
+
+Paleta em tons pastéis:
+    fundo      #F5F7FA   cinza-azulado bem claro
+    cartões    #FFFFFF   branco
+    destaque   #5B8FB9   azul suave
+    texto      #33404D   cinza-azulado escuro
+    apoio      #7A8794   cinza médio (legendas)
 
 Uso:
     from tema_visual import aplicar_tema
-    aplicar_tema()   # chamar logo depois de st.set_page_config(...)
+    aplicar_tema()   # logo depois de st.set_page_config(...)
 """
 
 import streamlit as st
 
 _CSS = """
 <style>
-    /* Fundo geral em degradê escuro */
+    /* ---------- Fundo ---------- */
     .stApp {
-        background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
-        color: #e6edf3;
+        background: linear-gradient(180deg, #F7F9FC 0%, #EEF2F7 100%);
     }
 
-    /* Títulos com o azul de destaque */
-    h1, h2, h3 {
-        color: #58a6ff !important;
-        font-weight: 700;
+    /* ---------- Títulos ----------
+       Bem maiores que o padrão: numa apresentação projetada, o título é o
+       que orienta quem assiste de longe. */
+    h1 {
+        color: #3D6E94 !important;
+        font-weight: 700 !important;
+        font-size: 2.6rem !important;
+        letter-spacing: -0.5px;
+        margin-bottom: 0.2rem !important;
+    }
+    h2 {
+        color: #3D6E94 !important;
+        font-weight: 650 !important;
+        font-size: 1.9rem !important;
+    }
+    h3 {
+        color: #4A7FA5 !important;
+        font-weight: 600 !important;
+        font-size: 1.35rem !important;
+        margin-top: 1.6rem !important;
     }
 
-    /* Botões com gradiente azul */
-    .stButton > button {
-        background: linear-gradient(90deg, #1f6feb, #58a6ff);
-        color: #ffffff;
-        border: none;
+    /* ---------- Menu lateral (navegação entre as páginas) ----------
+       O padrão é discreto demais para usar ao vivo diante de uma banca. */
+    section[data-testid="stSidebar"] {
+        background-color: #FFFFFF;
+        border-right: 1px solid #E1E8F0;
+    }
+    section[data-testid="stSidebar"] a,
+    section[data-testid="stSidebar"] a span,
+    section[data-testid="stSidebar"] li a p {
+        font-size: 1.12rem !important;
+        font-weight: 600 !important;
+        color: #3D6E94 !important;
+    }
+    section[data-testid="stSidebar"] a:hover {
+        background-color: #EEF4FA !important;
         border-radius: 8px;
-        padding: 0.55rem 1.4rem;
+    }
+
+    /* ---------- Botões ---------- */
+    .stButton > button {
+        background: #5B8FB9;
+        color: #FFFFFF;
+        border: none;
+        border-radius: 10px;
+        padding: 0.6rem 1.6rem;
         font-weight: 600;
-        transition: box-shadow 0.2s ease, transform 0.2s ease;
+        font-size: 1.02rem;
+        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
+        transition: background 0.15s ease, transform 0.15s ease;
     }
     .stButton > button:hover {
-        box-shadow: 0 0 14px rgba(88, 166, 255, 0.55);
+        background: #4A7FA5;
         transform: translateY(-1px);
     }
 
-    /* Campos de texto e área de texto */
+    /* ---------- Campos ---------- */
     .stTextInput > div > div > input,
-    .stTextArea textarea,
-    .stSelectbox > div > div {
-        background-color: #0d1117 !important;
-        color: #e6edf3 !important;
-        border: 1px solid #30363d !important;
-        border-radius: 6px !important;
+    .stTextArea textarea {
+        background-color: #FFFFFF !important;
+        color: #33404D !important;
+        border: 1px solid #D6DFEA !important;
+        border-radius: 8px !important;
+    }
+    .stTextInput > div > div > input:focus,
+    .stTextArea textarea:focus {
+        border-color: #5B8FB9 !important;
+        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.15) !important;
+    }
+    /* Texto de exemplo dentro dos campos */
+    .stTextInput input::placeholder,
+    .stTextArea textarea::placeholder {
+        color: #A9B4C0 !important;
+        font-style: italic;
     }
 
-    /* Cartões (expanders) com borda sutil, tipo "card" */
+    /* ---------- Cartões (expanders) ---------- */
     div[data-testid="stExpander"] {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 10px;
-        margin-bottom: 0.5rem;
+        background-color: #FFFFFF;
+        border: 1px solid #E1E8F0;
+        border-radius: 12px;
+        margin-bottom: 0.6rem;
+        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.06);
+    }
+    div[data-testid="stExpander"] summary {
+        font-weight: 600;
+        color: #33404D;
     }
 
-    /* Mensagens de sucesso/aviso/erro com cantos arredondados */
+    /* ---------- Avisos ---------- */
     div[data-testid="stAlert"] {
-        border-radius: 8px;
+        border-radius: 10px;
+        border: none;
     }
 
-    /* Métricas e legendas */
-    .stCaption, .stMarkdown p {
-        color: #c9d1d9;
+    /* ---------- Legendas ---------- */
+    .stCaption, div[data-testid="stCaptionContainer"] p {
+        color: #7A8794 !important;
+    }
+
+    /* ---------- Rótulos dos campos ---------- */
+    label p {
+        font-weight: 600 !important;
+        color: #4A5765 !important;
     }
 </style>
 """
 
 
 def aplicar_tema() -> None:
-    """Injeta o CSS do tema escuro/azul. Chamar uma vez, logo após
-    st.set_page_config(...)."""
+    """Injeta o CSS do tema. Chamar uma vez, logo após st.set_page_config(...)."""
     st.markdown(_CSS, unsafe_allow_html=True)

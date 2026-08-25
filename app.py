@@ -123,16 +123,62 @@ def upload_ipfs(arquivo):
     return None
 
 
-def geocode_endereco(rua, numero, bairro, cidade, estado, cep):
-    endereco_completo = f"{rua}, {numero}, {bairro}, {cidade}, {estado}, {cep}, Brasil"
+def _consultar_nominatim(consulta):
+    """Uma tentativa de busca no OpenStreetMap. Devolve (lat, lon) ou (None, None)."""
     url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": endereco_completo, "format": "json", "limit": 1}
+    params = {"q": consulta, "format": "json", "limit": 1, "countrycodes": "br"}
     headers = {"User-Agent": "DePINUrbano/1.0"}
-    response = requests.get(url, params=params, headers=headers)
-    if response.status_code == 200 and response.json():
-        resultado = response.json()[0]
-        return float(resultado["lat"]), float(resultado["lon"])
+    try:
+        resposta = requests.get(url, params=params, headers=headers, timeout=10)
+        if resposta.status_code == 200 and resposta.json():
+            r = resposta.json()[0]
+            return float(r["lat"]), float(r["lon"])
+    except Exception:
+        pass
     return None, None
+
+
+def geocode_endereco(logradouro, numero, bairro, cidade, estado, cep):
+    """
+    Descobre as coordenadas do endereço, tentando em cascata — do mais
+    específico ao mais genérico.
+
+    Por que em cascata: o Nominatim (a busca do OpenStreetMap) é exigente.
+    Ele frequentemente não tem o número exato de um imóvel, e nesse caso
+    devolve vazio — o que antes fazia o app cair no centro de São Paulo e
+    colocar o pino no lugar errado. Tentando também sem o número, e depois
+    só bairro/cidade, o ponto cai no lugar certo (ou pelo menos no bairro
+    certo) em vez de a quilômetros de distância.
+
+    Devolve (lat, lon, precisao), onde precisao é:
+        "exata"   — achou com número
+        "rua"     — achou a via, sem o número
+        "bairro"  — achou o bairro
+        "cidade"  — achou só a cidade
+        None      — não achou nada
+    """
+    cep_limpo = (cep or "").strip()
+    partes_cidade = f"{cidade}, {estado}, Brasil"
+
+    tentativas = [
+        (f"{logradouro}, {numero}, {bairro}, {partes_cidade}", "exata"),
+        (f"{logradouro}, {numero}, {partes_cidade}", "exata"),
+        (f"{logradouro}, {bairro}, {partes_cidade}", "rua"),
+        (f"{logradouro}, {partes_cidade}", "rua"),
+        (f"{cep_limpo}, Brasil", "rua") if cep_limpo else None,
+        (f"{bairro}, {partes_cidade}", "bairro") if bairro else None,
+        (partes_cidade, "cidade"),
+    ]
+
+    for tentativa in tentativas:
+        if tentativa is None:
+            continue
+        consulta, precisao = tentativa
+        lat, lon = _consultar_nominatim(consulta)
+        if lat is not None:
+            return lat, lon, precisao
+
+    return None, None, None
 
 
 WALLET_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
@@ -140,6 +186,18 @@ WALLET_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
 
 def wallet_valida(endereco: str) -> bool:
     return bool(WALLET_REGEX.match(endereco.strip()))
+
+
+def formatar_cep(cep_bruto: str) -> str:
+    """
+    Devolve o CEP no formato 00000-000, aceitando que a pessoa digite com
+    hífen, sem hífen, com pontos ou com espaços. Se não tiver 8 dígitos,
+    devolve o que foi digitado, sem inventar nada.
+    """
+    digitos = re.sub(r"\D", "", cep_bruto or "")
+    if len(digitos) == 8:
+        return f"{digitos[:5]}-{digitos[5:]}"
+    return (cep_bruto or "").strip()
 
 
 st.set_page_config(
@@ -152,7 +210,18 @@ st.set_page_config(
 )
 aplicar_tema()
 st.title("📡 DePIN Urbano")
-st.subheader("Registre um problema na sua cidade")
+st.subheader("Registre uma ocorrência")
+
+TIPOS_LOGRADOURO = [
+    "Rua", "Avenida", "Alameda", "Travessa", "Praça",
+    "Estrada", "Rodovia", "Largo", "Viela", "Via",
+]
+
+ESTADOS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+    "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+    "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]
 
 # A câmera nativa (st.camera_input) só é liberada pelo navegador em páginas
 # https:// ou em localhost. Acessando pelo celular via IP da rede local
@@ -164,24 +233,57 @@ foto = st.camera_input("📷 Tirar foto agora (só funciona no notebook)") or st
     type=["jpg", "jpeg", "png"])
 
 st.markdown("### Seus dados")
-nome = st.text_input("Nome completo")
+nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
 
 st.markdown("### Endereço do problema")
-rua = st.text_input("Rua")
-numero = st.text_input("Número")
-bairro = st.text_input("Bairro")
-cidade = st.text_input("Cidade")
-estado = st.text_input("Estado")
-cep = st.text_input("CEP")
+
+# Tipo e nome do logradouro lado a lado: além de encurtar a página no celular,
+# informar "Avenida" ou "Rua" melhora muito o acerto da busca de coordenadas —
+# o OpenStreetMap encontra "Avenida Maestro Cardim", mas tropeça em
+# "Maestro Cardim" sozinho.
+col_tipo, col_via = st.columns([1, 2])
+with col_tipo:
+    tipo_logradouro = st.selectbox("Tipo", TIPOS_LOGRADOURO)
+with col_via:
+    via = st.text_input("Logradouro", placeholder="Maestro Cardim")
+
+col_num, col_compl = st.columns(2)
+with col_num:
+    numero = st.text_input("Número", placeholder="963")
+with col_compl:
+    complemento = st.text_input(
+        "Complemento (opcional)", placeholder="apto 52, bloco B, casa 2")
+
+bairro = st.text_input("Bairro", placeholder="Bela Vista")
+
+col_cidade, col_estado = st.columns([3, 1])
+with col_cidade:
+    cidade = st.text_input("Cidade", placeholder="São Paulo")
+with col_estado:
+    estado = st.selectbox("Estado", ESTADOS, index=ESTADOS.index("SP"))
+
+cep = st.text_input(
+    "CEP", placeholder="01323-001",
+    help="Pode digitar com ou sem o hífen — o sistema ajusta.")
 
 st.markdown("### O que está acontecendo?")
-descricao = st.text_area("Descreva o problema")
+descricao = st.text_area(
+    "Descreva o problema",
+    placeholder="Ex.: Buraco na calçada em frente ao número 120, "
+                "com risco de queda para pedestres.")
 
 st.markdown("### Recompensa (opcional)")
+st.markdown(
+    "Copie o endereço da sua carteira digital e cole abaixo. "
+    "Quando o problema for resolvido e atualizado no sistema, você receberá "
+    "tokens **CP (Cidadão Participativo)** — que poderão ser usados em "
+    "serviços e benefícios municipais."
+)
 wallet = st.text_input(
-    "Carteira Web3 (endereço, ex: 0xabc123...) — receba tokens CP (Cidadão "
-    "Participativo) quando o problema for resolvido",
-    help="Campo opcional. Se você não tiver ou não quiser informar, pode deixar em branco.",
+    "Endereço da carteira",
+    placeholder="0x0000000000000000000000000000000000000000",
+    help="Campo opcional. Se você não tiver uma carteira ou preferir não "
+         "informar, deixe em branco — a ocorrência é registrada do mesmo jeito.",
 )
 
 if st.button("Enviar ocorrência"):
@@ -195,22 +297,47 @@ if st.button("Enviar ocorrência"):
             "Corrija ou deixe o campo em branco."
         )
 
-    if foto and descricao and nome and rua and cidade and wallet_ok:
+    if foto and descricao and nome and via and cidade and wallet_ok:
         with st.spinner("Enviando para o IPFS..."):
             cid = upload_ipfs(foto)
         if cid:
             st.success("✅ Imagem salva no IPFS!")
             st.code(f"CID: {cid}")
-            latitude, longitude = geocode_endereco(
-                rua, numero, bairro, cidade, estado, cep)
-            if latitude is None:
+
+            logradouro = f"{tipo_logradouro} {via}".strip()
+            cep_formatado = formatar_cep(cep)
+
+            with st.spinner("Localizando o endereço no mapa..."):
+                latitude, longitude, precisao = geocode_endereco(
+                    logradouro, numero, bairro, cidade, estado, cep_formatado)
+
+            if precisao == "exata":
+                st.success("📍 Endereço localizado com precisão.")
+            elif precisao == "rua":
+                st.info(
+                    "📍 Localizamos a via, mas não o número exato. "
+                    "O ponto no mapa fica na rua indicada.")
+            elif precisao == "bairro":
+                st.warning(
+                    "📍 Não encontramos a via; o ponto foi marcado no bairro informado.")
+            elif precisao == "cidade":
+                st.warning(
+                    "📍 Não encontramos o endereço; o ponto foi marcado no centro da cidade. "
+                    "Confira se o logradouro está escrito corretamente.")
+            else:
                 latitude, longitude = -23.5505, -46.6333
                 st.warning(
-                    "Não foi possível localizar o endereço exato; usando localização padrão.")
-            else:
-                st.success("📍 Endereço localizado com precisão.")
+                    "📍 Não foi possível localizar o endereço. "
+                    "Usando uma localização padrão — confira os campos e, "
+                    "se possível, registre de novo.")
 
-            endereco_completo = f"{rua}, {numero} - {bairro}, {cidade} - {estado}, {cep}"
+            partes_endereco = [f"{logradouro}, {numero}" if numero else logradouro]
+            if complemento.strip():
+                partes_endereco.append(complemento.strip())
+            partes_endereco.append(f"{bairro} - {cidade}/{estado}")
+            if cep_formatado:
+                partes_endereco.append(f"CEP {cep_formatado}")
+            endereco_completo = " - ".join(partes_endereco)
 
             try:
                 with st.spinner("Registrando na blockchain..."):
@@ -257,5 +384,15 @@ if st.button("Enviar ocorrência"):
         else:
             st.error("Erro ao enviar para o IPFS. Verifique a chave.")
     elif wallet_ok:
-        st.warning(
-            "Por favor, preencha nome, endereço, descrição e adicione a foto.")
+        faltando = []
+        if not foto:
+            faltando.append("a foto")
+        if not nome:
+            faltando.append("o nome")
+        if not via:
+            faltando.append("o logradouro")
+        if not cidade:
+            faltando.append("a cidade")
+        if not descricao:
+            faltando.append("a descrição do problema")
+        st.warning("Falta preencher: " + ", ".join(faltando) + ".")
