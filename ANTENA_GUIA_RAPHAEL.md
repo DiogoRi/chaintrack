@@ -19,7 +19,7 @@ O sistema tem três partes que **não conversam entre si diretamente**. Cada uma
   no app da                 permanente                   3 segundos
   nuvem
                                                          detectou algo novo?
-  DASHBOARD                                              acende o LED
+  DASHBOARD                                              pisca o LED
   conclui e       ────▶     token CP emitido    ◀────
   emite o token
 ```
@@ -28,12 +28,12 @@ O sistema tem três partes que **não conversam entre si diretamente**. Cada uma
 
 Quem aciona a antena é um programa separado, o **`vigia_antena.py`**, que roda no notebook durante a apresentação. Ele fica lendo dois contadores públicos na blockchain:
 
-| O que ele lê na blockchain | Quando esse número sobe | LED que acende |
+| O que ele lê na blockchain | Quando esse número sobe | LED que pisca |
 |---|---|---|
 | `total()` no contrato de ocorrências | Alguém registrou uma ocorrência nova | GPIO2 — LED_REGISTRO |
 | `totalSupply()` no contrato do token CP | Uma ocorrência foi concluída e o token enviado | GPIO4 — LED_CONCLUIDA |
 
-Subiu o número, acende a luz. Só isso.
+Subiu o número, a luz pisca. Só isso.
 
 ### Por que isso importa para a banca
 
@@ -41,11 +41,11 @@ A antena não sabe quem registrou, de que celular veio, nem em que rede a pessoa
 
 Se o app avisasse a antena, ela estaria confiando no aplicativo — e a resposta para *"isso não poderia ser um banco de dados comum?"* ficaria fraca. Do jeito que está, a resposta é: o dado é público, qualquer pessoa pode montar uma antena dessas e ela funciona sem pedir permissão a ninguém.
 
-Na demonstração isso fica visível: o registro sai de um celular no 4G, e a luz acende na maquete. Ninguém mandou nada de um para o outro.
+Na demonstração isso fica visível: o registro sai de um celular no 4G, e a luz pisca na maquete. Ninguém mandou nada de um para o outro.
 
 ### O que isso significa para você
 
-O sketch da ESP32 **não precisa saber de nada disso**. Ele continua só ouvindo comandos pela USB e acendendo LEDs. Toda a inteligência está do lado do Python.
+O sketch da ESP32 **não precisa saber de nada disso**. Ele continua só ouvindo comandos pela USB e piscando LEDs. Toda a inteligência está do lado do Python.
 
 Seu trabalho é: gravar o sketch, montar os LEDs e confirmar que a placa responde. Nada de blockchain do lado do hardware.
 
@@ -102,7 +102,7 @@ https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32
 ANTENA_PRONTA
 ```
 
-**4.8** Ainda no Serial Monitor, digite `REGISTRO` e dê Enter. O LED deve piscar 3x e ficar aceso, e a placa responde `OK_REGISTRO`.
+**4.8** Ainda no Serial Monitor, digite `REGISTRO` e dê Enter. O LED deve piscar 3x, e a placa responde `OK_REGISTRO`.
 
 Se chegou aqui, **o hardware está pronto**. O resto é configuração no notebook.
 
@@ -114,8 +114,8 @@ Uma linha por comando, terminada em `\n`:
 
 | Comando | Efeito | Resposta |
 |---|---|---|
-| `REGISTRO` | Pisca o LED_REGISTRO 3x e deixa aceso | `OK_REGISTRO` |
-| `CONCLUIDA` | Acende o LED_CONCLUIDA | `OK_CONCLUIDA` |
+| `REGISTRO` | Pisca o LED_REGISTRO 3x | `OK_REGISTRO` |
+| `CONCLUIDA` | Pisca o LED_CONCLUIDA 3x | `OK_CONCLUIDA` |
 | `RESET` | Apaga os dois LEDs (usar entre um ensaio e outro) | `OK_RESET` |
 
 Esses três comandos são toda a interface entre o Python e a placa. Se eles funcionam no Serial Monitor, funcionam no sistema.
@@ -202,13 +202,13 @@ Se falhar aqui, o problema é cabo, porta ou driver — não é o sistema.
 Ele testa a antena ao iniciar e depois fica observando. Com ele rodando:
 
 1. Registre uma ocorrência em https://chaintrack.streamlit.app (de qualquer celular, qualquer rede — pode ser pelo 4G)
-2. Em poucos segundos: `📍 NOVA OCORRÊNCIA detectada` + **LED_REGISTRO acende**
+2. Em poucos segundos: `📍 NOVA OCORRÊNCIA detectada` + **LED_REGISTRO pisca**
 3. No app, vá em "Dashboard da Prefeitura" e marque a ocorrência como **Concluída**
-4. Em poucos segundos: `✅ CONCLUSÃO detectada` + **LED_CONCLUIDA acende**
+4. Em poucos segundos: `✅ CONCLUSÃO detectada` + **LED_CONCLUIDA pisca**
 
-> ⚠️ O LED de conclusão só acende se a ocorrência tiver uma **carteira preenchida** no momento do registro. Sem carteira, nenhum token é criado, e é a criação do token que o vigia detecta. Na demonstração, sempre preencher a carteira.
+> ⚠️ O LED de conclusão só pisca se a ocorrência tiver uma **carteira preenchida** no momento do registro. Sem carteira, nenhum token é criado, e é a criação do token que o vigia detecta. Na demonstração, sempre preencher a carteira.
 
-**Detalhe do arranque:** ao iniciar, o vigia lê os contadores atuais e usa isso como ponto de partida. Ele não acende nada por causa das ocorrências antigas — só reage ao que acontecer **depois** que ele estiver rodando. Então inicie o vigia antes de fazer o registro de teste, não depois.
+**Detalhe do arranque:** ao iniciar, o vigia lê os contadores atuais e usa isso como ponto de partida. Ele não pisca nada por causa das ocorrências antigas — só reage ao que acontecer **depois** que ele estiver rodando. Então inicie o vigia antes de fazer o registro de teste, não depois.
 
 ---
 
@@ -219,13 +219,13 @@ Ele testa a antena ao iniciar e depois fica observando. Com ele rodando:
 | `could not open port` | Porta errada no `.env`, cabo só de energia (sem dados), ou driver faltando | Confirme a porta com a placa plugada e ajuste `SERIAL_PORT`; teste outro cabo |
 | Nenhuma porta aparece | Driver USB-serial ausente | Instale o driver CP2102 (Silicon Labs) ou CH340, conforme o chip da placa |
 | `ANTENA_PRONTA` não aparece | Sketch não gravado, ou baud rate diferente de 9600 | Regrave e confirme 9600 no Serial Monitor |
-| LED não acende, mas responde `OK_REGISTRO` | LED invertido ou resistor mal encaixado | Inverta o LED (perna longa no lado do resistor) |
+| LED não pisca, mas responde `OK_REGISTRO` | LED invertido ou resistor mal encaixado | Inverta o LED (perna longa no lado do resistor) |
 | A placa trava ao ligar | Uso de GPIO6-GPIO11 | Use apenas GPIO2 e GPIO4 |
 | O vigia diz "antena não respondeu" mas detecta os eventos | Só o cabo/porta estão errados; a lógica está certa | Corrija `SERIAL_PORT` — nada mais precisa mudar |
 | O vigia não detecta nada | RPC fora do ar | Troque o `RPC_URL` no `.env` (ver seção 9) |
-| Registrei e o LED não acendeu | O vigia foi iniciado depois do registro | Reinicie o vigia e registre de novo |
+| Registrei e o LED não piscou | O vigia foi iniciado depois do registro | Reinicie o vigia e registre de novo |
 
-Uma coisa importante: **nada disso derruba o sistema**. Se a antena não estiver plugada, ou a porta estiver errada, ou o `pyserial` não estiver instalado, o app e o dashboard continuam funcionando normalmente — só a luz não acende. Isso é proposital: a antena nunca pode ser o motivo de a demonstração parar.
+Uma coisa importante: **nada disso derruba o sistema**. Se a antena não estiver plugada, ou a porta estiver errada, ou o `pyserial` não estiver instalado, o app e o dashboard continuam funcionando normalmente — só a luz não pisca. Isso é proposital: a antena nunca pode ser o motivo de a demonstração parar.
 
 ---
 

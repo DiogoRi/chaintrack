@@ -21,9 +21,18 @@
   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json)
 
   Comandos aceitos (uma linha terminada em \n):
-    REGISTRO   -> pisca o LED_REGISTRO 3x e deixa aceso (ocorrência recebida)
-    CONCLUIDA  -> acende o LED_CONCLUIDA (ocorrência concluída + token enviado)
-    RESET      -> apaga os dois LEDs (usar entre uma demo e outra)
+    REGISTRO   -> pisca o LED_REGISTRO 3x  (ocorrência registrada na rede)
+    CONCLUIDA  -> pisca o LED_CONCLUIDA 3x (concluída + token CP enviado)
+    RESET      -> apaga os dois LEDs (usar entre um ensaio e outro)
+
+  Os LEDs piscam e apagam, em vez de ficarem acesos. Cada piscada marca um
+  evento novo detectado na blockchain, e a antena volta ao repouso — o que
+  também deixa a próxima piscada bem visível, sem precisar de RESET entre
+  uma ocorrência e outra.
+
+  Esta é a versão gravada e testada na placa. Se o sketch for alterado, a
+  placa precisa ser regravada: código no repositório e código na placa
+  fora de sincronia é a receita para horas de depuração inútil.
 
   Ligação (se só tiver 1 LED externo disponível, ligue só o LED_REGISTRO
   e ignore o comando CONCLUIDA — ele simplesmente não vai fazer nada, sem
@@ -65,10 +74,9 @@ void loop() {
 
     if (comando == "REGISTRO") {
       piscar(LED_REGISTRO, 3, 200);
-      digitalWrite(LED_REGISTRO, HIGH);
       Serial.println("OK_REGISTRO");
     } else if (comando == "CONCLUIDA") {
-      digitalWrite(LED_CONCLUIDA, HIGH);
+      piscar(LED_CONCLUIDA, 3, 200);
       Serial.println("OK_CONCLUIDA");
     } else if (comando == "RESET") {
       digitalWrite(LED_REGISTRO, LOW);

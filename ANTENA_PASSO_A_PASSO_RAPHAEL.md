@@ -14,11 +14,11 @@ O sistema tem três partes que **não conversam entre si**:
 
 - **O aplicativo**, que já está no ar em https://chaintrack.streamlit.app. Qualquer pessoa registra uma ocorrência pelo celular.
 - **A blockchain**, onde esse registro fica gravado de forma pública e permanente.
-- **A antena** (você), que fica lendo a blockchain e acende uma luz quando aparece algo novo.
+- **A antena** (você), que fica lendo a blockchain e pisca uma luz quando aparece algo novo.
 
 O aplicativo **não manda nada** para a antena. Não existe fio nem conexão entre eles. A antena descobre sozinha, olhando o dado público.
 
-**O que a placa faz:** recebe uma palavra pelo cabo USB e acende um LED. Quando chega a palavra `REGISTRO`, acende um LED. Quando chega `CONCLUIDA`, acende o outro. Só isso.
+**O que a placa faz:** recebe uma palavra pelo cabo USB e pisca um LED. Quando chega a palavra `REGISTRO`, pisca um LED. Quando chega `CONCLUIDA`, pisca o outro. Só isso.
 
 Toda a parte de blockchain acontece num programa Python rodando no computador. A placa nem fica sabendo que blockchain existe.
 
@@ -234,12 +234,12 @@ e aperte **Enter**.
 
 **O que deve acontecer:**
 
-- O **LED azul da própria placa** pisca 3 vezes e fica aceso
+- O **LED azul da própria placa** pisca 3 vezes
 - Aparece no monitor: `OK_REGISTRO`
 
 ### 5.5
 
-Digite `RESET` e Enter. O LED apaga e aparece `OK_RESET`.
+Digite `RESET` e Enter. Aparece `OK_RESET`.
 
 ---
 
@@ -323,17 +323,17 @@ Eles existem fisicamente na placa, mas por dentro estão ligados na memória ond
 
 Volte ao Serial Monitor (Parte 5), digite `REGISTRO` e Enter.
 
-- O LED **vermelho** deve piscar 3 vezes e ficar aceso.
+- O LED **vermelho** deve piscar 3 vezes.
 
 Digite `CONCLUIDA` e Enter.
 
-- O LED **verde** deve acender.
+- O LED **verde** deve piscar 3 vezes.
 
 Digite `RESET` e Enter. Os dois apagam.
 
-**Se um LED não acendeu mas apareceu `OK_REGISTRO` na tela:** o LED está invertido. Puxe ele, gire 180 graus, espete de novo. É isso em 90% dos casos.
+**Se um LED não piscou mas apareceu `OK_REGISTRO` na tela:** o LED está invertido. Puxe ele, gire 180 graus, espete de novo. É isso em 90% dos casos.
 
-**Se apareceu `OK_REGISTRO` e nem o LED azul da placa acendeu:** aí é o jumper solto ou espetado na linha errada. Confira se cada peça está na linha que a anterior termina.
+**Se apareceu `OK_REGISTRO` e nem o LED azul da placa piscou:** aí é o jumper solto ou espetado na linha errada. Confira se cada peça está na linha que a anterior termina.
 
 **Parte 6 concluída.**
 
@@ -437,7 +437,7 @@ Em uns 10 a 30 segundos, na janela preta aparece:
 📍 NOVA OCORRÊNCIA detectada na blockchain (total: 15). Acendendo a antena...
 ```
 
-**E o LED vermelho acende.**
+**E o LED vermelho pisca.**
 
 Repare no que acabou de acontecer: o celular estava no 4G, o aplicativo está num servidor em outro país, e não existe nenhuma conexão entre eles e a sua placa. A antena descobriu sozinha, lendo o dado público.
 
@@ -452,10 +452,10 @@ Para parar o programa: aperte **Control + C** na janela preta.
 | O que aparece | O que fazer |
 |---|---|
 | `could not open port COM3` | A porta está errada no `.env`, ou o Arduino IDE está com o Serial Monitor aberto segurando a porta. **Feche o Serial Monitor** e tente de novo |
-| `⚠️ Antena não respondeu` | Cabo ou porta. O programa continua funcionando e avisando na tela, só não acende luz |
+| `⚠️ Antena não respondeu` | Cabo ou porta. O programa continua funcionando e avisando na tela, só não pisca luz |
 | `python não é reconhecido` | Faltou marcar "Add Python to PATH" na instalação. Reinstale o Python marcando a caixinha |
 | `Faltam variáveis no .env` | O arquivo `.env` não foi salvo com o nome certo, ou foi salvo como `.env.txt` |
-| Registrei e não acendeu | O vigia precisa estar rodando **antes** do registro. Ele usa o momento em que iniciou como ponto de partida. Reinicie e registre de novo |
+| Registrei e não piscou | O vigia precisa estar rodando **antes** do registro. Ele usa o momento em que iniciou como ponto de partida. Reinicie e registre de novo |
 | `Falha na leitura inicial` | O servidor de blockchain caiu. Troque a linha do `.env` para `RPC_URL=https://polygon-amoy-bor-rpc.publicnode.com` |
 
 ---
@@ -464,7 +464,7 @@ Para parar o programa: aperte **Control + C** na janela preta.
 
 **Se a antena não funcionar no dia, a apresentação acontece do mesmo jeito.**
 
-O aplicativo, o dashboard, o registro na blockchain e o envio do token funcionam sem ela. A gente perde a luz acendendo, que é bonito, mas não perde o projeto. Isso foi construído de propósito: a antena nunca pode ser o motivo de a demonstração travar.
+O aplicativo, o dashboard, o registro na blockchain e o envio do token funcionam sem ela. A gente perde a luz piscando, que é bonito, mas não perde o projeto. Isso foi construído de propósito: a antena nunca pode ser o motivo de a demonstração travar.
 
 Mas seria ótimo ter.
 
