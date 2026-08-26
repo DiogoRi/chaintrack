@@ -161,8 +161,17 @@ def info_prazo(r, hoje=None):
     }
 
 
-def texto_prazo(r, hoje=None) -> str:
-    """Frase curta sobre o prazo, para mostrar ao cidadão e no painel."""
+def texto_prazo(r, hoje=None, publico=True) -> str:
+    """Frase curta sobre o prazo.
+
+    O texto muda conforme quem está lendo. Para o cidadão, uma ocorrência
+    ainda não encaminhada precisa de uma explicação: ele não sabe o que
+    esperar nem quando. Para quem trabalha no município, essa mesma frase
+    não informa nada, porque encaminhar é justamente o trabalho dele — ali
+    o que interessa é que o relógio ainda não começou a correr.
+
+    Use publico=False no painel do município.
+    """
     status = r.get("status", "recebida")
 
     if status == "concluida":
@@ -172,10 +181,13 @@ def texto_prazo(r, hoje=None) -> str:
         return "Concluída."
 
     if status == "recebida":
-        return (f"Após o recebimento, a ocorrência é encaminhada à equipe "
-                f"responsável em até {PRAZO_PADRAO_DIAS} dias úteis. A partir "
-                f"desse encaminhamento, você passa a ver aqui a data prevista "
-                f"de conclusão.")
+        if publico:
+            return (f"Após o recebimento, a ocorrência é encaminhada à equipe "
+                    f"responsável em até {PRAZO_PADRAO_DIAS} dias úteis. A "
+                    f"partir desse encaminhamento, você passa a ver aqui a "
+                    f"data prevista de conclusão.")
+        return ("Aguardando encaminhamento. O prazo de execução começa a "
+                "contar quando a situação passar para Em andamento.")
 
     info = info_prazo(r, hoje)
     if not info["tem_prazo"]:

@@ -249,7 +249,11 @@ if registros:
 
         with st.expander(titulo):
             # ---- Prazo ----
-            frase = texto_prazo(r)
+            # publico=False: aqui quem lê é a equipe que atende, não o
+            # cidadão. A frase explicativa sobre o que vai acontecer com a
+            # ocorrência não faz sentido para quem é o responsável por
+            # fazer isso acontecer.
+            frase = texto_prazo(r, publico=False)
             if status_atual == "concluida":
                 st.success(frase)
             elif dados_prazo["atrasada"]:
