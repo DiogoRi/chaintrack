@@ -102,8 +102,8 @@ st.markdown("""
 | Camada | Função |
 | --- | --- |
 | **Coleta** | Interface web acessada pelo celular, onde o cidadão envia foto, descrição e localização, e depois acompanha o atendimento pelo protocolo. |
-| **Rede DePIN (antena)** | Nó físico que observa a blockchain por conta própria e sinaliza a atividade da rede. Nesta fase representa o nó; a evolução é transportar o registro por LoRaWAN. |
-| **Armazenamento híbrido** | A imagem fica no IPFS; apenas os metadados vão para a blockchain. Guardar imagens on-chain seria caro e desnecessário. |
+| **Rede DePIN (antena)** | Nó físico que observa a blockchain por conta própria e sinaliza a atividade da rede. Nesta fase representa o nó; a evolução é transportar o registro por rádio de longo alcance (LoRaWAN). |
+| **Armazenamento híbrido** | A imagem fica no IPFS; para a blockchain vão apenas os dados do registro (o código da imagem, o endereço, a data). Guardar a foto inteira na blockchain seria caro e desnecessário. |
 """)
 
 st.markdown("### Por que DePIN")
@@ -201,27 +201,134 @@ st.markdown("""
 | --- | --- |
 | **Fase 1** | Concepção: o problema, a proposta e a arquitetura pretendida. |
 | **Fase 2** | Primeiro protótipo: coleta, IPFS, prova on-chain e dashboard com mapa, demonstrados em vídeo. |
-| **Fase 3** | Sistema integrado e funcionando ao vivo: aplicativo publicado, status de atendimento, token de recompensa emitido automaticamente e antena física reagindo à blockchain. |
+| **Fase 3** | Sistema integrado e funcionando ao vivo: aplicativo publicado, acompanhamento pelo cidadão, prazo com responsável, token de recompensa emitido automaticamente e antena física reagindo à blockchain. |
+| **Fase 4** *(projetada)* | Confirmação da obra pelo cidadão que passa pelo local, com foto e localização, também recompensada. Identidade verificada por gov.br ou CPF. |
 """)
 
-st.markdown("### Próximos passos")
+st.markdown("### O próximo passo: quem confirma que a obra foi feita?")
+
+st.markdown("""
+O sistema atual tem um ponto aberto, e vale nomeá-lo com clareza: **quem
+declara que o serviço foi concluído é o próprio município** — a mesma parte
+que está sendo cobrada pelo prazo. A blockchain garante que a data de abertura
+não pode ser adulterada, mas não garante que a árvore foi de fato retirada.
+
+A Fase 4 fecha esse ciclo. A ideia é simples: **quem confirma é quem passa
+pelo local.**
+
+Ao concluir uma ocorrência, ela entra numa lista aberta de confirmação por
+alguns dias. Qualquer cidadão que esteja ali pode dizer se o serviço foi
+mesmo feito, e recebe token por isso. O cidadão deixa de ser apenas quem
+reporta e passa a ser **quem audita**.
+""")
+
+st.markdown("""
+| Regra | Por que existe |
+| --- | --- |
+| **Foto obrigatória** | Sem ela a confirmação pode ser feita de casa. A foto é o que prova que alguém esteve no local. |
+| **Localização exigida, com raio de tolerância** | O aparelho precisa estar a poucas dezenas de metros da ocorrência. O raio existe porque o GPS do celular erra: sem tolerância, quem está de fato na esquina certa seria recusado. |
+| **Uma confirmação por pessoa** | Impede que a mesma pessoa multiplique a recompensa confirmando a mesma obra várias vezes. |
+| **Janela de alguns dias** | Concentra as confirmações no período em que o serviço ainda pode ser conferido, e dá previsibilidade a quem executou. |
+""")
+
+st.markdown("""
+Isso muda o desenho do incentivo, e essa é a parte mais importante.
+
+Recompensar apenas quem **relata** cria um incentivo torto: em tese, alguém
+poderia danificar algo para depois registrar. Recompensar também quem
+**confirma a resolução** desloca parte do valor para o lado construtivo da
+rede, e cria um segundo grupo de participantes cujo interesse é que o
+problema seja de fato resolvido.
+""")
+
+st.markdown("### Por que a localização vale diferente em cada momento")
+
+st.markdown("""
+A mesma informação — onde a pessoa está — serve a dois propósitos distintos,
+e por isso o sistema a trata de dois jeitos.
+
+**Ao registrar uma ocorrência, a localização ajuda mas não trava.** O ganho
+principal aqui nem é comprovar presença: é **acabar com a digitação do
+endereço**, que hoje é a parte mais cansativa do formulário. O aplicativo
+preenche sozinho e a pessoa só corrige se for preciso.
+
+E ela não pode ser obrigatória nesse momento. Quem viu um buraco de manhã e
+só foi registrar à noite, em casa, seria bloqueado — e essa pessoa está
+fazendo exatamente o que o sistema quer que ela faça.
+
+**Ao confirmar uma obra, a localização é obrigatória.** Aqui a afirmação é
+sobre o **estado atual** do lugar: dizer que o serviço foi feito só significa
+alguma coisa se quem diz está vendo. É a diferença entre relatar uma lembrança
+e atestar o presente.
+""")
+
+st.markdown("### O que este sistema não é")
+
+st.markdown("""
+**Não é canal de emergência.** Vazamento de gás, fio de energia caído,
+princípio de incêndio, risco imediato a alguém: nesses casos a pessoa deve
+ligar para os bombeiros ou para a concessionária **na hora**, e não abrir uma
+ocorrência aqui. Um registro que espera atendimento em dias não serve para
+o que precisa de minutos, e o aplicativo deixa isso claro para quem usa.
+
+O terreno deste projeto é o da zeladoria urbana: buraco na via, calçada
+quebrada, poste apagado, entulho, árvore caída, pintura de faixa. Coisas que
+incomodam muita gente por muito tempo, e que hoje desaparecem dentro de
+sistemas fechados.
+
+**Nem tudo é responsabilidade da prefeitura.** Água que sai do bueiro é da
+companhia de saneamento; fio partido é da distribuidora de energia. Nesses
+casos o município encaminha a ocorrência ao órgão competente — e é aí que
+mora um problema conhecido de quem já tentou resolver alguma coisa: cada um
+diz que a responsabilidade é do outro, e o cidadão fica no meio.
+
+**O encaminhamento também vira um registro público.** Fica gravado quando a
+ocorrência saiu da prefeitura, para quem foi, e a partir de que momento o
+prazo passa a correr contra a concessionária. A responsabilidade é
+transferida com prova, e ninguém pode alegar depois que nunca recebeu.
+""")
+
+st.markdown("### O limite que essa etapa não resolve sozinha")
+
+st.markdown("""
+**Identidade.** Hoje quem identifica um participante é o endereço da carteira,
+e isso não é identidade de verdade: nada impede que uma mesma pessoa crie
+várias carteiras e finja ser várias pessoas. Isso tem nome — **ataque sybil**
+— e é um problema central em qualquer rede que distribui recompensa sem saber
+quem é quem.
+
+A exigência de foto e de localização já torna a fraude trabalhosa: para
+confirmar uma obra é preciso estar fisicamente no lugar, e a recompensa por
+confirmação é pequena por definição. Isso desestimula o esforço de burlar,
+mas não elimina a possibilidade.
+
+Num sistema com uso governamental, o caminho natural é a autenticação por
+**gov.br** ou por CPF verificado, ligando uma pessoa real a uma participação —
+mantendo a carteira apenas como endereço de recebimento, e não como documento.
+""")
+
+st.markdown("### Outros passos previstos")
 
 st.markdown("""
 - **Áudio e vídeo no registro** — há ocorrências que a foto não captura, como
   ruído excessivo ou vazamento audível.
-- **LoRaWAN** — permitirá que a antena transmita o registro (o código da
+- **LoRaWAN** (*Long Range Wide Area Network*, uma rede de rádio de longo
+  alcance e baixo consumo, feita para enviar pouquíssimos dados a vários
+  quilômetros) — permitirá que a antena transmita o registro (o código da
   imagem, a localização e o horário) mesmo onde não há internet, deixando de
   representar um nó para se tornar um nó de fato. A antena não precisa
   carregar a foto: ela carrega o registro. A imagem vai por rede convencional
   quando houver, e é sincronizada depois — o LoRaWAN transporta pacotes
   pequenos, não fotos.
-- **Token intransferível** *(soulbound)* — reforça que o CP é crédito cívico,
-  e não algo negociável.
-- **Selos de reputação por NFT** — Bronze, Prata e Ouro conforme o volume de
-  contribuições do cidadão.
+- **Token intransferível** — um token que fica preso à carteira que o recebeu
+  e não pode ser vendido nem repassado (em inglês, *soulbound*). Reforça que o
+  CP é crédito cívico, e não algo negociável.
+- **Selos de reputação por NFT** (*Non-Fungible Token*, um token único, que
+  representa um item específico em vez de um valor) — Bronze, Prata e Ouro
+  conforme o volume de contribuições do cidadão.
 - **Carteira conectada via MetaMask**, dispensando a digitação do endereço.
-- **Validação de veracidade** dos registros, com verificação cruzada de
-  metadados das imagens.
+- **Endereço preenchido pela localização do aparelho**, eliminando os campos
+  de rua, número, bairro e CEP no momento do registro.
 """)
 
 st.markdown("### Equipe")
