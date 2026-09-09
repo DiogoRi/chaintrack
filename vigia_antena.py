@@ -56,9 +56,12 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from antena_serial import enviar_sinal  # noqa: E402
-
+# O .env é carregado ANTES de importar a antena. A ordem importa: se o
+# módulo da antena for importado primeiro, ele pode acabar lendo a porta
+# serial antes de o .env existir na memória.
 load_dotenv(BASE_DIR / ".env")
+
+from antena_serial import enviar_sinal  # noqa: E402
 
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 TOKEN_CONTRACT_ADDRESS = os.getenv("TOKEN_CONTRACT_ADDRESS")

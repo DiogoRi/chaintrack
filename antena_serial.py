@@ -16,6 +16,16 @@ Uso:
 
 import os
 import time
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Carrega o .env aqui dentro, e não só no app que importa este arquivo.
+# Motivo: este módulo também é usado sozinho (python3 antena_serial.py) e
+# pelo vigia. Se depender de quem importa ter carregado o .env antes, a
+# porta serial vem errada e a antena simplesmente não responde, sem erro
+# aparente. Foi exatamente o que aconteceu no primeiro teste no Mac.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # O pyserial é importado de forma tolerante: se a biblioteca não estiver
 # instalada na máquina (por exemplo, num notebook que só vai rodar o
@@ -38,8 +48,17 @@ except ImportError:
 #   Windows costuma ser algo como "COM3", "COM4"...
 #   Mac costuma ser algo como "/dev/cu.usbmodemXXXX" ou "/dev/cu.usbserial-XXXX"
 #   Linux costuma ser "/dev/ttyUSB0" ou "/dev/ttyACM0"
-SERIAL_PORT = os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
-BAUD_RATE = int(os.getenv("BAUD_RATE", "9600"))
+# Lidas por função, e não uma única vez ao importar. Assim, mesmo que o
+# .env seja carregado depois deste modulo, o valor certo é usado.
+def porta_serial() -> str:
+    return os.getenv("SERIAL_PORT", "/dev/ttyUSB0")
+
+
+def baud_rate() -> int:
+    try:
+        return int(os.getenv("BAUD_RATE", "9600"))
+    except ValueError:
+        return 9600
 
 # Tempo que o Arduino leva pra reiniciar quando a porta serial é aberta
 # (comportamento normal de placas Uno/Nano ao conectar por USB).
@@ -59,9 +78,16 @@ def enviar_sinal(comando: str, timeout: float = 3.0) -> bool:
         print(f"[antena] Sinal '{comando}' ignorado: pyserial não instalado.")
         return False
     try:
-        with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=timeout) as ser:
+        with serial.Serial(porta_serial(), baud_rate(), timeout=timeout) as ser:
+            # Abrir a porta reinicia a placa. Esperamos ela terminar de subir
+            # antes de falar, senão o comando se perde no meio do arranque.
             time.sleep(TEMPO_BOOT_ARDUINO)
+            ser.reset_input_buffer()
             ser.write(f"{comando}\n".encode("utf-8"))
+            ser.flush()
+            # Um respiro antes de fechar: fechar imediatamente após escrever
+            # pode cortar a transmissão no meio.
+            time.sleep(0.3)
         return True
     except Exception as e:
         print(f"[antena] Não foi possível enviar sinal '{comando}' para a antena: {e}")
@@ -78,24 +104,57 @@ def testar_conexao() -> bool:
         print("[antena] pyserial não instalado. Rode: pip3 install pyserial")
         return False
     try:
-        with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=3.0) as ser:
+        with serial.Serial(porta_serial(), baud_rate(), timeout=1.0) as ser:
+            # Ao abrir a porta, a ESP32 reinicia e imprime as mensagens do
+            # próprio carregador dela, numa velocidade diferente da nossa.
+            # Lido a 9600, isso vira lixo. Por isso esperamos a placa subir e
+            # jogamos fora tudo que chegou antes de começar a conversa.
             time.sleep(TEMPO_BOOT_ARDUINO)
-            linha = ser.readline().decode("utf-8", errors="ignore").strip()
-            if linha:
-                print(f"[antena] Antena respondeu: '{linha}'")
-                return True
-            print("[antena] Antena conectou, mas não respondeu nada. Confira o sketch.")
+            ser.reset_input_buffer()
+
+            # Em vez de só escutar, mandamos um comando. Assim o teste também
+            # acende o LED, e dá para confirmar com os olhos, não só pela tela.
+            ser.write(b"REGISTRO\n")
+            ser.flush()
+
+            esperadas = ("ANTENA_PRONTA", "OK_REGISTRO", "OK_")
+            limite = time.time() + 6.0
+            recebidas = []
+
+            while time.time() < limite:
+                bruta = ser.readline()
+                if not bruta:
+                    continue
+                linha = bruta.decode("utf-8", errors="ignore").strip()
+                if not linha:
+                    continue
+                recebidas.append(linha)
+                if any(linha.startswith(e) for e in esperadas):
+                    print(f"[antena] Antena respondeu: '{linha}'")
+                    print("[antena] O LED deve ter piscado 3 vezes.")
+                    return True
+
+            if recebidas:
+                print("[antena] A placa respondeu, mas nada reconhecível:")
+                for linha in recebidas[-5:]:
+                    print(f"         {linha!r}")
+                print("[antena] Confira se o sketch gravado é o antena_depin.ino")
+                print("         e se a velocidade no .env é 9600.")
+            else:
+                print("[antena] A porta abriu, mas a placa não respondeu nada.")
+                print("         Possíveis causas, nesta ordem:")
+                print("         1. O cabo é só de carga, sem fios de dados")
+                print("         2. O Serial Monitor do Arduino IDE está aberto")
+                print("         3. O sketch não está gravado na placa")
             return False
     except Exception as e:
-        print(f"[antena] Falha ao conectar na porta {SERIAL_PORT}: {e}")
+        print(f"[antena] Falha ao conectar na porta {porta_serial()}: {e}")
         return False
 
 
 if __name__ == "__main__":
-    print(f"Testando conexão com a antena em {SERIAL_PORT} @ {BAUD_RATE} baud...")
-    ok = testar_conexao()
-    if ok:
-        print("Enviando sinal de teste REGISTRO...")
-        enviar_sinal("REGISTRO")
+    print(f"Testando conexão com a antena em {porta_serial()} @ {baud_rate()} baud...")
+    if testar_conexao():
+        print("\nTudo certo. A antena está pronta para a demonstração.")
     else:
-        print("Ajuste SERIAL_PORT no .env e tente novamente.")
+        print("\nConfira o SERIAL_PORT no .env e as causas acima.")
