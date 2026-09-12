@@ -11,6 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from tema_visual import aplicar_tema
+from ocorrencias import criar_registro
 
 # Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
 # porque o app agora tem duas páginas (a segunda vive em pages/), e caminhos
@@ -27,6 +28,8 @@ WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
 CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")
 RPC_URL = os.getenv("RPC_URL")
 PINATA_JWT = os.getenv("PINATA_JWT")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
 
 required_env_vars = {
     "PRIVATE_KEY": PRIVATE_KEY,
@@ -34,6 +37,8 @@ required_env_vars = {
     "CONTRACT_ADDRESS": CONTRACT_ADDRESS,
     "RPC_URL": RPC_URL,
     "PINATA_JWT": PINATA_JWT,
+    "SUPABASE_URL": SUPABASE_URL,
+    "SUPABASE_SECRET_KEY": SUPABASE_SECRET_KEY,
 }
 
 missing_env_vars = [name for name, value in required_env_vars.items() if not value]
@@ -386,45 +391,7 @@ if enviar:
                 partes_endereco.append(f"CEP {cep_formatado}")
             endereco_completo = " - ".join(partes_endereco)
 
-            tx_hash = ""
-            onchain_ok = False
-            try:
-                with st.spinner("Registrando na blockchain..."):
-                    tx_hash = registrar_blockchain(
-                        cid, descricao, endereco_completo, latitude, longitude)
-                    recibo = w3.eth.wait_for_transaction_receipt(
-                        tx_hash, timeout=120)
-
-                if recibo.status == 1:
-                    onchain_ok = True
-                    st.success("✅ Registrado na blockchain!")
-                    st.markdown(
-                        f"🔗 [Ver o registro no PolygonScan](https://amoy.polygonscan.com/tx/{tx_hash})")
-                    st.caption(
-                        "⛓️ **Ninguém pode apagar ou alterar esta ocorrência.** "
-                        "O link é a sua prova, com data e hora."
-                    )
-                else:
-                    st.error(
-                        "❌ A transação foi minerada mas reverteu (status 0). "
-                        "O dado NÃO foi gravado on-chain. Confira o ABI e os tipos dos parâmetros.")
-            except Exception as e:
-                st.warning(f"Falha ao registrar na blockchain: {e}")
-
-            # O app NÃO aciona a antena. Quem faz isso é o vigia_antena.py,
-            # observando a blockchain de forma independente. Manter as duas
-            # coisas geraria acionamento duplicado e, pior, enfraqueceria a
-            # tese do projeto: a antena não deve confiar no aplicativo, e sim
-            # no registro público.
-            st.info(
-                "📡 A antena da rede detecta este registro diretamente na "
-                "blockchain, sem depender deste aplicativo.")
-
-            protocolo = uuid.uuid4().hex[:8].upper()
-            momento = datetime.now().strftime("%d/%m/%Y às %H:%M")
-
-            registro = {
-                "id": protocolo.lower(),
+            dados = {
                 "nome": nome,
                 "email": email.strip(),
                 "endereco": endereco_completo,
@@ -432,28 +399,30 @@ if enviar:
                 "latitude": latitude,
                 "longitude": longitude,
                 "cid": cid,
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "status": "recebida",
                 "wallet": wallet_limpa,
-                "token_tx": "",
-                # Hash da transação de registro. Guardar isso permite que o
-                # dashboard mostre a prova on-chain de cada ocorrência e,
-                # principalmente, distinga as que ficaram só no arquivo local
-                # porque a blockchain falhou naquele momento.
-                "tx_registro": tx_hash if onchain_ok else "",
-                "onchain": onchain_ok,
-                # Campos da etapa de atendimento. Nascem vazios: quem os
-                # preenche é o painel do município, conforme a ocorrência
-                # avança. O prazo só começa a correr quando ela é encaminhada
-                # a uma equipe, então aqui ainda não há data nenhuma.
-                "setor": "Não atribuído",
-                "prazo_dias": 10,
-                "data_andamento": "",
-                "data_conclusao": "",
-                "mensagens": [],
             }
-            with open(REGISTROS_PATH, "a") as f:
-                f.write(json.dumps(registro) + "\n")
+            try:
+                registro_criado = criar_registro(dados)
+            except Exception as e:
+                st.error(
+                    f"❌ Não foi possível salvar sua ocorrência agora: {e}. "
+                    "Tente novamente em instantes.")
+                st.stop()
+
+            # O app NÃO registra na blockchain nem aciona a antena diretamente.
+            # Isso agora é trabalho de um processo separado (o "worker"), que
+            # roda de forma independente e depois preenche o hash da
+            # transação nesta ocorrência. Assim, se a blockchain estiver
+            # lenta ou fora do ar, o cidadão não fica esperando: a
+            # ocorrência já está salva e o comprovante já existe.
+            st.info(
+                "📡 O registro na blockchain e a detecção pela antena da "
+                "rede acontecem de forma independente deste aplicativo, "
+                "logo em seguida.")
+
+            protocolo = registro_criado["id"].upper()
+            momento = datetime.now().strftime("%d/%m/%Y às %H:%M")
+            tx_hash = ""
 
             # Guarda o comprovante na memória da sessão em vez de desenhá-lo
             # aqui dentro. Motivo: o botão de download recarrega a página, e
