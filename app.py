@@ -11,7 +11,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from tema_visual import aplicar_tema
-from ocorrencias import criar_registro
+from ocorrencias import criar_registro, buscar_antena_por_slug
 
 # Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
 # porque o app agora tem duas páginas (a segunda vive em pages/), e caminhos
@@ -41,7 +41,8 @@ required_env_vars = {
     "SUPABASE_SECRET_KEY": SUPABASE_SECRET_KEY,
 }
 
-missing_env_vars = [name for name, value in required_env_vars.items() if not value]
+missing_env_vars = [name for name,
+                    value in required_env_vars.items() if not value]
 
 if missing_env_vars:
     st.set_page_config(
@@ -52,10 +53,36 @@ if missing_env_vars:
     aplicar_tema()
     st.title("📡 DePIN Urbano")
     st.error(
-        "Faltam variaveis de ambiente no arquivo .env: " + ", ".join(missing_env_vars)
+        "Faltam variaveis de ambiente no arquivo .env: " +
+        ", ".join(missing_env_vars)
     )
-    st.info("Crie um .env na raiz do projeto com base em .env.example e preencha os valores.")
+    st.info(
+        "Crie um .env na raiz do projeto com base em .env.example e preencha os valores.")
     st.stop()
+
+# BLOCO 3: leitura da URL da gincana. Se a pessoa chegou aqui a partir do
+# QR Code de uma antena (via o site do Rafa), a URL traz "a" (o slug da
+# antena) e "p" (o id do participante). Conferimos a antena ANTES de
+# desenhar qualquer parte do formulário — se ela não bater com uma antena
+# ativa no banco, a pessoa nunca chega a ver o formulário, evitando
+# ocorrências "meio registradas" sem pontos definidos.
+slug_antena = st.query_params.get("a")
+participante_id = st.query_params.get("p")
+antena_numero = None
+
+if slug_antena:
+    antena_numero = buscar_antena_por_slug(slug_antena)
+    if antena_numero is None:
+        st.set_page_config(
+            page_title="DePIN Urbano",
+            page_icon="📡",
+            initial_sidebar_state="expanded",
+        )
+        aplicar_tema()
+        st.title("📡 DePIN Urbano")
+        st.error("Não conseguimos confirmar esta antena da gincana agora.")
+        st.info("Procure a equipe de apoio no estande — ela resolve isso rapidinho.")
+        st.stop()
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
@@ -130,10 +157,12 @@ def upload_ipfs(arquivo):
 def _consultar_nominatim(consulta):
     """Uma tentativa de busca no OpenStreetMap. Devolve (lat, lon) ou (None, None)."""
     url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": consulta, "format": "json", "limit": 1, "countrycodes": "br"}
+    params = {"q": consulta, "format": "json",
+              "limit": 1, "countrycodes": "br"}
     headers = {"User-Agent": "DePINUrbano/1.0"}
     try:
-        resposta = requests.get(url, params=params, headers=headers, timeout=10)
+        resposta = requests.get(
+            url, params=params, headers=headers, timeout=10)
         if resposta.status_code == 200 and resposta.json():
             r = resposta.json()[0]
             return float(r["lat"]), float(r["lon"])
@@ -383,7 +412,8 @@ if enviar:
                     "Usando uma localização padrão — confira os campos e, "
                     "se possível, registre de novo.")
 
-            partes_endereco = [f"{logradouro}, {numero}" if numero else logradouro]
+            partes_endereco = [
+                f"{logradouro}, {numero}" if numero else logradouro]
             if complemento.strip():
                 partes_endereco.append(complemento.strip())
             partes_endereco.append(f"{bairro} - {cidade}/{estado}")
@@ -401,6 +431,11 @@ if enviar:
                 "cid": cid,
                 "wallet": wallet_limpa,
             }
+            if antena_numero is not None:
+                dados["origem"] = "evento"
+                dados["antena_numero"] = antena_numero
+                dados["participante_id"] = participante_id
+
             try:
                 registro_criado = criar_registro(dados)
             except Exception as e:
@@ -490,7 +525,13 @@ if comprovante:
         "precisar de login."
     )
 
-    link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
+    if participante_id:
+        st.link_button(
+            "Voltar para o meu painel da gincana",
+            f"https://depin-urbano.vercel.app/eu?p={participante_id}",
+        )
+
+        link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
     link_tx = (f"https://amoy.polygonscan.com/tx/{comprovante['tx_hash']}"
                if comprovante["tx_hash"] else "")
 
@@ -532,7 +573,6 @@ if comprovante:
         "Obrigado por ser um cidadão participativo e contribuir",
         "para uma cidade melhor.",
     ]
-
 
     # O botão de baixar aparece duas vezes de propósito: aqui em cima, onde a
     # pessoa chega, e de novo no fim do comprovante. Antes ele existia só no

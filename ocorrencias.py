@@ -38,8 +38,9 @@ import requests
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-REGISTROS_PATH = BASE_DIR / "registros.json"   # não é mais usado para ler/gravar;
-                                                # fica só de referência histórica.
+# não é mais usado para ler/gravar;
+REGISTROS_PATH = BASE_DIR / "registros.json"
+# fica só de referência histórica.
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -54,6 +55,7 @@ if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
     )
 
 _REST = f"{SUPABASE_URL}/rest/v1/ocorrencias"
+_REST_ANTENAS = f"{SUPABASE_URL}/rest/v1/antenas"
 _HEADERS = {
     "apikey": SUPABASE_SECRET_KEY,
     "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
@@ -351,6 +353,8 @@ def _para_banco(r):
     return {
         "protocolo": r.get("id"),
         "origem": r.get("origem", "normal"),
+        "antena_numero": r.get("antena_numero"),
+        "participante_id": r.get("participante_id") or None,
         "tipo": r.get("tipo", "outro"),
         "nome": r.get("nome") or None,
         "email": r.get("email") or None,
@@ -396,6 +400,30 @@ def _do_banco(row):
         "mensagens": row.get("mensagens") or [],
         "arquivada": bool(row.get("arquivada", False)),
     })
+
+
+def buscar_antena_por_slug(slug):
+    """Devolve o numero da antena ativa correspondente ao slug, ou None.
+    Usado no bloco 3: quando o cidadao chega pela URL da gincana (?a=<slug>),
+    confirmamos que a antena existe e esta ativa ANTES de mostrar o formulario.
+    """
+    if not slug:
+        return None
+    try:
+        resp = requests.get(
+            _REST_ANTENAS,
+            headers=_HEADERS,
+            params={"slug": f"eq.{slug}",
+                    "ativa": "eq.true", "select": "numero"},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        linhas = resp.json()
+    except Exception:
+        return None
+    if not linhas:
+        return None
+    return linhas[0]["numero"]
 
 
 def carregar_registros(caminho=None):
@@ -445,9 +473,11 @@ def criar_registro(dados):
     exatamente o problema que esta troca resolve.
     """
     protocolo = uuid.uuid4().hex[:8]
-    registro = normalizar({**dados, "id": protocolo, "status": dados.get("status", "recebida")})
+    registro = normalizar(
+        {**dados, "id": protocolo, "status": dados.get("status", "recebida")})
     linha = _para_banco(registro)
-    resp = requests.post(_REST, headers=_HEADERS, json=[linha], timeout=_TIMEOUT)
+    resp = requests.post(_REST, headers=_HEADERS, json=[
+                         linha], timeout=_TIMEOUT)
     resp.raise_for_status()
     return registro
 
