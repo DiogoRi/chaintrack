@@ -6,3 +6,4 @@ folium
 streamlit-folium
 streamlit-autorefresh
 pyserial
+streamlit-js-eval==1.0.0

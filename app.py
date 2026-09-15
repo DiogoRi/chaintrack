@@ -11,7 +11,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from tema_visual import aplicar_tema
-from ocorrencias import criar_registro, buscar_antena_por_slug
+from ocorrencias import criar_registro, buscar_antena_por_slug, buscar_endereco_por_coordenada
+from streamlit_js_eval import get_geolocation
 
 # Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
 # porque o app agora tem duas páginas (a segunda vive em pages/), e caminhos
@@ -233,6 +234,35 @@ def formatar_cep(cep_bruto: str) -> str:
     return (cep_bruto or "").strip()
 
 
+UF_POR_ESTADO = {
+    "Acre": "AC", "Alagoas": "AL", "Amapá": "AP", "Amazonas": "AM",
+    "Bahia": "BA", "Ceará": "CE", "Distrito Federal": "DF",
+    "Espírito Santo": "ES", "Goiás": "GO", "Maranhão": "MA",
+    "Mato Grosso": "MT", "Mato Grosso do Sul": "MS", "Minas Gerais": "MG",
+    "Pará": "PA", "Paraíba": "PB", "Paraná": "PR", "Pernambuco": "PE",
+    "Piauí": "PI", "Rio de Janeiro": "RJ", "Rio Grande do Norte": "RN",
+    "Rio Grande do Sul": "RS", "Rondônia": "RO", "Roraima": "RR",
+    "Santa Catarina": "SC", "São Paulo": "SP", "Sergipe": "SE",
+    "Tocantins": "TO",
+}
+
+
+def separar_tipo_logradouro(via_completa):
+    """Tenta separar o tipo (Rua, Avenida, ...) do resto do nome da via,
+    a partir do texto que o Nominatim devolveu (ex: "Avenida Paulista").
+    Se nao reconhecer nenhum tipo conhecido no comeco do texto, devolve
+    "Rua" como padrao e o texto inteiro no lugar do nome, para a pessoa
+    ajustar se precisar.
+    """
+    if not via_completa:
+        return "Rua", ""
+    for tipo in TIPOS_LOGRADOURO:
+        prefixo = tipo + " "
+        if via_completa.lower().startswith(prefixo.lower()):
+            return tipo, via_completa[len(prefixo):].strip()
+    return "Rua", via_completa
+
+
 st.set_page_config(
     page_title="DePIN Urbano",
     page_icon="📡",
@@ -301,34 +331,91 @@ descricao = st.text_area(
 
 st.markdown("### Onde fica a ocorrência?")
 
+# BLOCO 3-B: geolocalizacao automatica. A pessoa aperta o botao, o navegador
+# pede permissao e devolve a coordenada (lat/lon) dela. Traduzimos essa
+# coordenada em endereco (rua, bairro, cidade, estado, CEP) e usamos como
+# valor inicial dos campos abaixo — que continuam editaveis, exatamente
+# como se a pessoa tivesse digitado. Numero e complemento nunca sao
+# preenchidos sozinhos: o GPS nao sabe o numero da casa, entao esses campos
+# ficam sempre esperando a pessoa completar.
+if "aguardando_localizacao" not in st.session_state:
+    st.session_state["aguardando_localizacao"] = False
+if "endereco_preenchido_auto" not in st.session_state:
+    st.session_state["endereco_preenchido_auto"] = False
+
+if st.button("📍 Usar minha localização"):
+    st.session_state["aguardando_localizacao"] = True
+    st.rerun()
+
+if st.session_state["aguardando_localizacao"]:
+    localizacao = get_geolocation()
+    if localizacao and localizacao.get("coords"):
+        st.session_state["aguardando_localizacao"] = False
+        lat = localizacao["coords"]["latitude"]
+        lon = localizacao["coords"]["longitude"]
+        resultado = buscar_endereco_por_coordenada(lat, lon)
+        if resultado:
+            tipo_detectado, via_detectada = separar_tipo_logradouro(
+                resultado["via"])
+            if via_detectada:
+                st.session_state["tipo_logradouro_input"] = tipo_detectado
+                st.session_state["via_input"] = via_detectada
+            if resultado["bairro"]:
+                st.session_state["bairro_input"] = resultado["bairro"]
+            if resultado["cidade"]:
+                st.session_state["cidade_input"] = resultado["cidade"]
+            if resultado["estado"] in UF_POR_ESTADO:
+                st.session_state["estado_input"] = UF_POR_ESTADO[resultado["estado"]]
+            if resultado["cep"]:
+                st.session_state["cep_input"] = formatar_cep(resultado["cep"])
+            if resultado["numero"]:
+                st.session_state["numero_input"] = resultado["numero"]
+            st.session_state["endereco_preenchido_auto"] = True
+        else:
+            st.warning(
+                "Não conseguimos identificar um endereço a partir da sua "
+                "localização. Preencha os campos abaixo manualmente.")
+        st.rerun()
+    else:
+        st.caption("📍 Aguardando permissão de localização do navegador...")
+
+if st.session_state["endereco_preenchido_auto"]:
+    st.caption(
+        "📍 Endereço preenchido automaticamente. Confira se está certo e "
+        "complete o número e o complemento.")
+
 # Tipo e nome do logradouro lado a lado: além de encurtar a página no celular,
 # informar "Avenida" ou "Rua" melhora muito o acerto da busca de coordenadas —
 # o OpenStreetMap encontra "Avenida Maestro Cardim", mas tropeça em
 # "Maestro Cardim" sozinho.
 col_tipo, col_via = st.columns([1, 2])
 with col_tipo:
-    tipo_logradouro = st.selectbox("Tipo", TIPOS_LOGRADOURO)
+    tipo_logradouro = st.selectbox(
+        "Tipo", TIPOS_LOGRADOURO, key="tipo_logradouro_input")
 with col_via:
-    via = st.text_input("Logradouro", placeholder="Maestro Cardim")
+    via = st.text_input(
+        "Logradouro", placeholder="Maestro Cardim", key="via_input")
 
 col_num, col_compl = st.columns(2)
 with col_num:
-    numero = st.text_input("Número", placeholder="963")
+    numero = st.text_input("Número", placeholder="963", key="numero_input")
 with col_compl:
     complemento = st.text_input(
         "Complemento (opcional)", placeholder="apto 52, bloco B, casa 2")
 
-bairro = st.text_input("Bairro", placeholder="Bela Vista")
+bairro = st.text_input(
+    "Bairro", placeholder="Bela Vista", key="bairro_input")
 
 col_cidade, col_estado = st.columns([3, 1])
 with col_cidade:
-    cidade = st.text_input("Cidade", placeholder="São Paulo")
+    cidade = st.text_input(
+        "Cidade", placeholder="São Paulo", key="cidade_input")
 with col_estado:
-    estado = st.selectbox("Estado", ESTADOS, index=ESTADOS.index("SP"))
+    estado = st.selectbox(
+        "Estado", ESTADOS, index=ESTADOS.index("SP"), key="estado_input")
 
 cep = st.text_input("CEP (pode digitar com ou sem o hífen)",
-                    placeholder="01323-001")
-
+                    placeholder="01323-001", key="cep_input")
 st.markdown("### Seus dados")
 nome = st.text_input("Nome completo", placeholder="Maria da Silva Santos")
 email = st.text_input(

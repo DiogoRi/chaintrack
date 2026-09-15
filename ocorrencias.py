@@ -426,6 +426,84 @@ def buscar_antena_por_slug(slug):
     return linhas[0]["numero"]
 
 
+def buscar_endereco_por_coordenada(lat, lon):
+    """Traduz uma coordenada (latitude, longitude) vinda do GPS do navegador
+    em um endereco legivel (rua, bairro, cidade), usando o servico gratuito
+    Nominatim (OpenStreetMap).
+    Usado no bloco 3-b: quando o cidadao aperta 'Usar minha localizacao'.
+    Se qualquer coisa der errado, devolve None e o formulario cai no
+    preenchimento manual, sem travar o cadastro.
+    """
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            headers={"User-Agent": "DePIN-Urbano-FIAP/1.0"},
+            params={
+                "lat": lat,
+                "lon": lon,
+                "format": "json",
+                "addressdetails": 1,
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+    except Exception:
+        return None
+
+    endereco = dados.get("address", {})
+    resultado = {
+        "via": endereco.get("road") or endereco.get("pedestrian") or "",
+        "bairro": endereco.get("suburb") or endereco.get("neighbourhood") or "",
+        "cidade": endereco.get("city") or endereco.get("town") or endereco.get("municipality") or "",
+        "estado": endereco.get("state") or "",
+        "cep": endereco.get("postcode") or "",
+        "numero": endereco.get("house_number") or "",
+    }
+
+    # Em areas rurais, o Nominatim (OpenStreetMap) costuma saber o CEP mas
+    # nao sabe o nome da cidade ou do bairro -- isso depende de voluntarios
+    # terem mapeado aquele trecho, o que raramente acontece no interior. Os
+    # Correios, por outro lado, sempre sabem a qual cidade um CEP pertence.
+    # Por isso, se faltar a cidade mas tivermos um CEP, completamos com o
+    # ViaCEP -- sem sobrescrever o que o Nominatim ja sabia.
+    if not resultado["cidade"] and resultado["cep"]:
+        dados_cep = buscar_endereco_por_cep(resultado["cep"])
+        if dados_cep:
+            for campo in ("via", "bairro", "cidade"):
+                if not resultado[campo] and dados_cep[campo]:
+                    resultado[campo] = dados_cep[campo]
+
+    return resultado
+
+
+def buscar_endereco_por_cep(cep):
+    """Consulta o CEP no ViaCEP (o webservice dos Correios) e devolve o que
+    encontrar (via, bairro, cidade, estado), ou None se o CEP nao existir ou
+    o servico falhar.
+    """
+    cep_limpo = "".join(c for c in (cep or "") if c.isdigit())
+    if len(cep_limpo) != 8:
+        return None
+    try:
+        resp = requests.get(
+            f"https://viacep.com.br/ws/{cep_limpo}/json/",
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+    except Exception:
+        return None
+    if dados.get("erro"):
+        return None
+    return {
+        "via": dados.get("logradouro") or "",
+        "bairro": dados.get("bairro") or "",
+        "cidade": dados.get("localidade") or "",
+        "estado": dados.get("uf") or "",
+    }
+
+
 def carregar_registros(caminho=None):
     """Lê do Supabase todas as ocorrências do fluxo normal (não-evento).
 
