@@ -215,13 +215,6 @@ def geocode_endereco(logradouro, numero, bairro, cidade, estado, cep):
     return None, None, None
 
 
-WALLET_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
-
-
-def wallet_valida(endereco: str) -> bool:
-    return bool(WALLET_REGEX.match(endereco.strip()))
-
-
 def formatar_cep(cep_bruto: str) -> str:
     """
     Devolve o CEP no formato 00000-000, aceitando que a pessoa digite com
@@ -426,20 +419,13 @@ st.caption(
     "ocorrência."
 )
 
-st.markdown("### Recompensa (opcional)")
+st.markdown("### Recompensa")
 st.markdown(
-    "Copie o endereço da sua carteira digital e cole abaixo. "
-    "Quando a ocorrência for atendida e atualizada no sistema, você receberá "
-    "tokens **CP (Cidadão Participativo)**, que poderão ser usados em "
+    "Ao ter sua ocorrência atendida, você ganha pontos **CP (Cidadão "
+    "Participativo)**. Eles ficam guardados automaticamente no seu painel, "
+    "junto com o histórico das suas ocorrências — sem precisar de carteira "
+    "digital nem de nenhum cadastro extra. Os pontos poderão ser usados em "
     "serviços e benefícios municipais."
-)
-wallet = st.text_input(
-    "Endereço da carteira",
-    placeholder="0x0000000000000000000000000000000000000000",
-)
-st.caption(
-    "Não tem carteira ou prefere não informar? Deixe em branco. "
-    "A ocorrência é registrada do mesmo jeito."
 )
 
 st.markdown("")  # respiro antes do botão
@@ -451,17 +437,7 @@ with col_botao:
     enviar = st.button("Enviar ocorrência", use_container_width=True)
 
 if enviar:
-    wallet_limpa = wallet.strip()
-    wallet_ok = True
-    if wallet_limpa and not wallet_valida(wallet_limpa):
-        wallet_ok = False
-        st.error(
-            "O endereço de carteira informado não parece válido "
-            "(precisa começar com '0x' e ter 42 caracteres). "
-            "Corrija ou deixe o campo em branco."
-        )
-
-    if foto and descricao and nome and via and cidade and wallet_ok:
+    if foto and descricao and nome and via and cidade:
         with st.spinner("Enviando para o IPFS..."):
             cid = upload_ipfs(foto)
         if cid:
@@ -516,7 +492,6 @@ if enviar:
                 "latitude": latitude,
                 "longitude": longitude,
                 "cid": cid,
-                "wallet": wallet_limpa,
             }
             if antena_numero is not None:
                 dados["origem"] = "evento"
@@ -559,7 +534,6 @@ if enviar:
                 "descricao": descricao,
                 "cid": cid,
                 "tx_hash": tx_hash,
-                "wallet": wallet_limpa,
             }
             st.balloons()
             # A pessoa acabou de enviar e a tela dela está no meio do
@@ -573,7 +547,7 @@ if enviar:
             )
         else:
             st.error("Erro ao enviar para o IPFS. Verifique a chave.")
-    elif wallet_ok:
+    else:
         faltando = []
         if not foto:
             faltando.append("a foto")
@@ -615,10 +589,10 @@ if comprovante:
     if participante_id:
         st.link_button(
             "Voltar para o meu painel da gincana",
-            f"https://depin-urbano.vercel.app/eu?p={participante_id}",
+            f"https://depinurbano.vercel.app/eu?p={participante_id}",
         )
 
-        link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
+    link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
     link_tx = (f"https://amoy.polygonscan.com/tx/{comprovante['tx_hash']}"
                if comprovante["tx_hash"] else "")
 
@@ -641,9 +615,7 @@ if comprovante:
         f"  {comprovante['descricao']}",
         "",
     ]
-    if comprovante["wallet"]:
-        linhas_texto += [
-            f"Carteira para a recompensa: {comprovante['wallet']}", ""]
+
     linhas_texto += [
         "COMPROVAÇÕES PERMANENTES",
         "-" * 46,
@@ -688,9 +660,6 @@ if comprovante:
                 st.markdown(f"**E-mail:** {comprovante['email']}")
             st.markdown(f"**Endereço:** {comprovante['endereco']}")
             st.markdown(f"**Ocorrência:** {comprovante['descricao']}")
-            if comprovante["wallet"]:
-                st.markdown(
-                    f"**Carteira para a recompensa:** `{comprovante['wallet']}`")
 
         with col_foto:
             st.image(link_foto, width=220)
