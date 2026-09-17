@@ -25,7 +25,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from mint_token import concluir_ocorrencia    # noqa: E402
 from ocorrencias import (                      # noqa: E402
     LABEL_PARA_STATUS,
     PRAZO_PADRAO_DIAS,
@@ -95,76 +94,12 @@ INTERVALO_MS = 2000
 
 registros = carregar_registros()
 
-# ===========================================================================
-# Conclusão on-chain: por que existe esta etapa separada
-#
-# A transação de conclusão leva de 5 a 30 segundos. O auto-refresh de 2s
-# reiniciaria o script no meio do envio e o resultado nunca apareceria na
-# tela. Por isso o fluxo é dividido em dois momentos:
-#
-#   1. O botão "Atualizar" apenas ANOTA que aquela ocorrência precisa ser
-#      concluída on-chain (em st.session_state) e recarrega a página.
-#   2. Nesse novo carregamento, o auto-refresh NÃO é montado, então nada
-#      interrompe a transação. Ela roda com calma e o resultado é guardado
-#      para ser exibido no carregamento seguinte.
-# ===========================================================================
-pendente = st.session_state.get("conclusao_pendente")
-
-if not pendente:
-    st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
+st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
 
 st.markdown(
     "<p class='titulo-dashboard'>🗺️ Dashboard do Município</p>",
     unsafe_allow_html=True)
 
-if pendente:
-    alvo = next((r for r in registros if r.get("id") == pendente), None)
-
-    if alvo is None:
-        st.session_state.pop("conclusao_pendente", None)
-        st.rerun()
-
-    st.info(
-        "⏳ Registrando a conclusão na blockchain e enviando o token CP. "
-        "Isso leva de 5 a 30 segundos — **não feche nem atualize a página.**"
-    )
-    with st.spinner("Enviando transação para a Polygon Amoy..."):
-        try:
-            tx = concluir_ocorrencia(alvo["cid"], alvo["wallet"])
-            alvo["token_tx"] = tx
-            salvar_registros(registros)
-            st.session_state["conclusao_resultado"] = ("ok", tx)
-        except Exception as e:
-            st.session_state["conclusao_resultado"] = ("erro", str(e))
-
-    # A antena NÃO é acionada daqui. Quem a aciona é o vigia_antena.py, que
-    # observa os contratos na blockchain de forma independente. Se o dashboard
-    # também sinalizasse, o LED piscaria duas vezes e, pior, a antena passaria
-    # a confiar no aplicativo em vez de confiar no registro público, que é
-    # exatamente o contrário da tese do projeto.
-
-    st.session_state.pop("conclusao_pendente", None)
-    st.rerun()
-
-resultado = st.session_state.pop("conclusao_resultado", None)
-if resultado:
-    tipo, valor = resultado
-    if tipo == "ok":
-        st.success("✅ Conclusão registrada na blockchain e token CP enviado!")
-        st.markdown(
-            f"🔗 [Ver a transação no Polygonscan](https://amoy.polygonscan.com/tx/{valor})"
-        )
-    elif tipo == "sem_carteira":
-        st.warning(
-            "Ocorrência marcada como concluída, mas sem carteira informada — "
-            "nenhuma transação de conclusão foi enviada."
-        )
-    else:
-        st.error(
-            f"⚠️ Falha ao registrar a conclusão on-chain: {valor}\n\n"
-            "O status foi salvo como concluída mesmo assim. Selecione "
-            "**Concluída** e clique em **Atualizar** de novo para tentar outra vez."
-        )
 
 st.markdown(
     "<p class='subtitulo-dashboard'>Ocorrências registradas</p>",
@@ -218,9 +153,10 @@ if registros:
         "Atualize o status manualmente conforme o andamento. Ao passar para "
         "**Em andamento**, começa a contar o prazo de execução e o cidadão "
         "passa a ver a data prevista na consulta por protocolo. Ao marcar como "
-        "**Concluída**, se a ocorrência tiver uma carteira informada, sai uma "
-        "transação na blockchain que registra a conclusão e envia o token "
-        "CP (Cidadão Participativo), tudo de uma vez."
+        "**Concluída**, o status já é salvo na hora; o registro da conclusão "
+        "na blockchain e o envio do token CP (Cidadão Participativo) "
+        "acontecem em seguida, em segundo plano, e o comprovante aparece "
+        "aqui assim que estiver pronto."
     )
 
     def mostrar_ocorrencia(r):
@@ -269,7 +205,8 @@ if registros:
             st.write(f"**Descrição:** {r.get('descricao', 'N/A')}")
             st.write(f"**Data:** {r.get('data', 'N/A')}")
             st.write(f"**Carteira:** {r.get('wallet') or '_não informada_'}")
-            st.write(f"**Equipe responsável:** {r.get('setor', 'Não atribuído')}")
+            st.write(
+                f"**Equipe responsável:** {r.get('setor', 'Não atribuído')}")
 
             if r.get("cid"):
                 link_foto = f"https://gateway.pinata.cloud/ipfs/{r['cid']}"
@@ -356,12 +293,8 @@ if registros:
                 mudou_setor = setor_escolhido != r.get("setor")
                 mudou_prazo = int(prazo_escolhido) != int(
                     r.get("prazo_dias") or PRAZO_PADRAO_DIAS)
-                precisa_tentar_onchain = (
-                    novo_status == "concluida" and not r.get("token_tx")
-                )
 
-                if not (mudou_status or mudou_setor or mudou_prazo
-                        or precisa_tentar_onchain):
+                if not (mudou_status or mudou_setor or mudou_prazo):
                     st.info("Nada mudou nesta ocorrência.")
                 else:
                     r["setor"] = setor_escolhido
@@ -369,14 +302,6 @@ if registros:
                     if mudou_status:
                         aplicar_status(r, novo_status)
                     salvar_registros(registros)
-
-                    if precisa_tentar_onchain:
-                        if r.get("wallet"):
-                            st.session_state["conclusao_pendente"] = r["id"]
-                        else:
-                            st.session_state["conclusao_resultado"] = (
-                                "sem_carteira", "")
-
                     st.rerun()
 
             # ---- Mensagens ----
