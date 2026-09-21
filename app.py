@@ -587,9 +587,19 @@ if comprovante:
     )
 
     if participante_id:
-        st.link_button(
-            "Voltar para o meu painel da gincana",
-            f"https://depinurbano.vercel.app/eu?p={participante_id}",
+        # st.link_button sempre abre em nova aba (limitação do próprio
+        # Streamlit, sem parâmetro pra mudar isso — pedido do Rafa em 19/09).
+        # Trocado por um link HTML puro com target="_self", que abre na
+        # mesma aba, estilizado igual aos outros botões do app (mesmas cores
+        # e medidas de .stButton > button em tema_visual.py).
+        st.markdown(
+            f'<a href="https://depinurbano.vercel.app/eu?p={participante_id}" '
+            'target="_self" style="display:inline-block;background:#5B8FB9;'
+            'color:#FFFFFF;border:none;border-radius:10px;padding:0.9rem 2rem;'
+            'font-weight:650;font-size:1.55rem;text-decoration:none;'
+            'box-shadow:0 1px 3px rgba(59,89,116,0.18);">'
+            'Voltar para o meu painel da gincana</a>',
+            unsafe_allow_html=True,
         )
 
     link_foto = f"https://gateway.pinata.cloud/ipfs/{comprovante['cid']}"
