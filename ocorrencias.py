@@ -56,6 +56,14 @@ if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
 
 _REST = f"{SUPABASE_URL}/rest/v1/ocorrencias"
 _REST_ANTENAS = f"{SUPABASE_URL}/rest/v1/antenas"
+# BLOCO 9: as duas funções de identidade do cidadão (criar_participante,
+# recuperar_participante) já existem no Supabase desde a Fase 5 inicial,
+# criadas para o app em React do Raphael chamar diretamente. Aqui elas são
+# chamadas por REST simples, do mesmo jeito que o resto deste arquivo já
+# fala com o banco — são funções (RPC), não tabelas, por isso o endereço
+# é /rest/v1/rpc/<nome-da-funcao> em vez de /rest/v1/<tabela>.
+_RPC_CRIAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/criar_participante"
+_RPC_RECUPERAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/recuperar_participante"
 _HEADERS = {
     "apikey": SUPABASE_SECRET_KEY,
     "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
@@ -424,6 +432,67 @@ def buscar_antena_por_slug(slug):
     if not linhas:
         return None
     return linhas[0]["numero"]
+
+
+def criar_participante_automatico():
+    """BLOCO 9: cria um participante novo para o cidadão do fluxo normal
+    (fora da gincana), usando um apelido interno gerado pelo próprio
+    código — nunca escolhido nem visto pela pessoa, e nunca exibido em
+    nenhuma tela (o telão só soma ocorrências com origem='evento', então
+    esse apelido nunca aparece lá).
+
+    Existe só para satisfazer a função criar_participante() do Supabase,
+    que foi desenhada pensando na gincana e por isso exige um apelido.
+
+    Devolve {"id":..., "apelido":..., "codigo_recup":...} do novo
+    participante, ou None se não conseguir depois de algumas tentativas
+    (por exemplo, sem conexão com o Supabase).
+    """
+    for _ in range(3):
+        apelido_interno = "cidadao_" + uuid.uuid4().hex[:10]
+        try:
+            resp = requests.post(
+                _RPC_CRIAR_PARTICIPANTE,
+                headers=_HEADERS,
+                json={"p_apelido": apelido_interno},
+                timeout=_TIMEOUT,
+            )
+            resp.raise_for_status()
+            resultado = resp.json()
+        except Exception:
+            return None
+        if resultado.get("ok"):
+            return resultado["participante"]
+        if resultado.get("erro") != "apelido_em_uso":
+            # "apelido_curto" não deveria acontecer (o texto gerado sempre
+            # tem bem mais de 2 caracteres) e "tente_de_novo" é raríssimo —
+            # mas se vier, tentar de novo com o mesmo motivo não ajudaria.
+            return None
+    return None
+
+
+def recuperar_participante_por_codigo(codigo):
+    """BLOCO 9: confere um código de recuperação e devolve o participante
+    correspondente, ou None se o código não existir ou algo falhar.
+    Usado quando o cidadão do fluxo normal cola o código de um painel que
+    já tinha (por exemplo, vindo de outro aparelho).
+    """
+    if not codigo or not codigo.strip():
+        return None
+    try:
+        resp = requests.post(
+            _RPC_RECUPERAR_PARTICIPANTE,
+            headers=_HEADERS,
+            json={"p_codigo": codigo.strip()},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        resultado = resp.json()
+    except Exception:
+        return None
+    if resultado.get("ok"):
+        return resultado["participante"]
+    return None
 
 
 def buscar_endereco_por_coordenada(lat, lon):

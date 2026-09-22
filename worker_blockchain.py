@@ -309,7 +309,7 @@ def _enviar_um_registro_pendente():
         "foto_falhou": "eq.false",
         "tx_hash_registro": "is.null",
         "tentativas": f"lt.{RETRIES_MAX}",
-        "select": "id,foto_cid,descricao,endereco,lat,lng,tentativas",
+        "select": "id,foto_cid,protocolo,tentativas",
         "order": "criado_em.asc",
         "limit": "5",
     })
@@ -365,17 +365,30 @@ def _enviar_registro(ocorrencia):
     """
     Adaptado de `registrar_blockchain()`, que hoje está órfão dentro do
     app.py (não é mais chamado de lá desde que a blockchain saiu do
-    formulário no Bloco 2) — mesma assinatura de contrato, mesma escala de
-    coordenadas.
+    formulário no Bloco 2) — mesma assinatura de contrato (5 parâmetros,
+    sem redeploy).
+
+    Ajustado em 22/09 — LGPD/privacidade, a pedido do Rafa depois do teste
+    dele com foto e endereço reais indo pro Polygonscan: o contrato
+    continua exigindo os mesmos 5 parâmetros, mas só o CID da foto e o
+    protocolo vão de verdade. Descrição, endereço e coordenadas exatas do
+    cidadão continuam guardados normalmente no Supabase (privado, só nosso)
+    — não são mais gravados on-chain (público, permanente, pra sempre).
+    Quem tiver o protocolo consegue confirmar que a ocorrência existe (pelo
+    CID) e, com acesso ao Supabase, ver todos os dados reais — sem expor
+    endereço nem coordenada de ninguém direto na blockchain. Efeito
+    colateral bom: reduz o custo de gas do Registrar (texto livre era a
+    maior parte do custo). Decisão do Diogo (22/09); dá pra voltar com
+    lat/lng no futuro se fizer sentido — é só trocar os dois `0` abaixo.
     """
     id_ = ocorrencia["id"]
     conta = Web3.to_checksum_address(WALLET_ADDRESS)
     fn = contract.functions.registrar(
         ocorrencia["foto_cid"],
-        ocorrencia.get("descricao") or "",
-        ocorrencia.get("endereco") or "",
-        int((ocorrencia.get("lat") or 0) * COORD_ESCALA),
-        int((ocorrencia.get("lng") or 0) * COORD_ESCALA),
+        ocorrencia.get("protocolo") or "",
+        "",
+        0,
+        0,
     )
     try:
         gas = int(fn.estimate_gas({"from": conta}) * 1.3)
