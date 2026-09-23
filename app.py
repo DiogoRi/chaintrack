@@ -11,8 +11,14 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 from tema_visual import aplicar_tema
-from ocorrencias import criar_registro, buscar_antena_por_slug, buscar_endereco_por_coordenada
-from streamlit_js_eval import get_geolocation
+from ocorrencias import (
+    criar_registro,
+    buscar_antena_por_slug,
+    buscar_endereco_por_coordenada,
+    criar_participante_automatico,
+    recuperar_participante_por_codigo,
+)
+from streamlit_js_eval import get_geolocation, streamlit_js_eval
 
 # Caminhos absolutos a partir da pasta deste arquivo. Isso é necessário
 # porque o app agora tem duas páginas (a segunda vive em pages/), e caminhos
@@ -273,6 +279,91 @@ st.markdown(
 )
 st.subheader("Registre uma ocorrência")
 
+# ===========================================================================
+# BLOCO 9: identidade do cidadão no fluxo normal (fora da gincana)
+#
+# No fluxo da gincana, o participante_id já chega pronto na URL (?p=...),
+# criado pelo site em React antes de mandar a pessoa pra cá — por isso este
+# bloco inteiro fica de fora quando `antena_numero is not None`.
+#
+# No fluxo normal, o cidadão comum também passa a ganhar um participante_id
+# persistente, pra poder ver o painel dele em depinurbano.vercel.app/eu mais
+# tarde. Resolvido em camadas:
+#   1) dentro da mesma sessão do navegador (mesma aba aberta), guardado em
+#      st.session_state — não precisa resolver de novo a cada rodada;
+#   2) entre sessões, no mesmo aparelho — o navegador guarda o id no
+#      localStorage (streamlit_js_eval, a mesma biblioteca já usada desde o
+#      Bloco 3-B pra geolocalização), lido sozinho, uma vez, quando a pessoa
+#      chega numa aba nova;
+#   3) manual, escondida num expander — um código de recuperação, pra quem
+#      troca de aparelho e perdeu o localStorage.
+# Se nenhuma das três achar nada, um participante novo só é criado na hora
+# de enviar a ocorrência (lá embaixo, dentro do "if enviar:") — de propósito
+# na primeira ocorrência, não já na visita, pra não sobrar participante
+# "fantasma" de quem só passou pra olhar o formulário.
+#
+# Precisa vir DEPOIS do st.set_page_config() logo acima: streamlit_js_eval é
+# um componente de verdade (não um widget nativo do Streamlit), e chamá-lo
+# antes do set_page_config quebra a página inteira.
+CHAVE_LOCALSTORAGE_PARTICIPANTE = "depin_participante_id"
+_SEM_ID_SALVO = "__sem_id__"
+codigo_recuperacao_novo = None
+
+if antena_numero is None:
+    if "participante_id_ativo" in st.session_state:
+        participante_id = st.session_state["participante_id_ativo"]
+
+    if not participante_id:
+        if "id_local_verificado" not in st.session_state:
+            st.session_state["id_local_verificado"] = False
+
+        if not st.session_state["id_local_verificado"]:
+            # O "|| '...'" do lado do JavaScript existe só pra diferenciar
+            # duas situações que a biblioteca devolveria como o mesmo None:
+            # "o navegador ainda não respondeu" e "respondeu, e o valor
+            # realmente está vazio". Sem isso nunca saberíamos quando parar
+            # de esperar.
+            resultado_local = streamlit_js_eval(
+                js_expressions=(
+                    f"localStorage.getItem('{CHAVE_LOCALSTORAGE_PARTICIPANTE}') "
+                    f"|| '{_SEM_ID_SALVO}'"
+                ),
+                key="ler_participante_id_local",
+            )
+            if resultado_local is not None:
+                st.session_state["id_local_verificado"] = True
+                if resultado_local != _SEM_ID_SALVO:
+                    participante_id = resultado_local
+                    st.session_state["participante_id_ativo"] = participante_id
+
+    if not participante_id:
+        with st.expander("Já registrou antes? Recupere o seu painel"):
+            codigo_digitado = st.text_input(
+                "Código de recuperação",
+                placeholder="Ex.: RDRMH65X",
+                key="codigo_recuperacao_input",
+            )
+            if st.button("Recuperar", key="botao_recuperar_participante"):
+                participante_recuperado = recuperar_participante_por_codigo(
+                    codigo_digitado)
+                if participante_recuperado:
+                    participante_id = participante_recuperado["id"]
+                    st.session_state["participante_id_ativo"] = participante_id
+                    streamlit_js_eval(
+                        js_expressions=(
+                            f"localStorage.setItem("
+                            f"'{CHAVE_LOCALSTORAGE_PARTICIPANTE}', "
+                            f"'{participante_id}')"
+                        ),
+                        key="salvar_participante_id_recuperado",
+                    )
+                    st.success(
+                        "Painel recuperado! Pode continuar e registrar sua "
+                        "ocorrência.")
+                else:
+                    st.error(
+                        "Código não encontrado. Confira e tente de novo.")
+
 TIPOS_LOGRADOURO = [
     "Rua", "Avenida", "Alameda", "Travessa", "Praça",
     "Estrada", "Rodovia", "Largo", "Viela", "Via",
@@ -484,6 +575,26 @@ if enviar:
                 partes_endereco.append(f"CEP {cep_formatado}")
             endereco_completo = " - ".join(partes_endereco)
 
+            # BLOCO 9: se chegou até aqui sem participante_id (fluxo normal,
+            # sem localStorage nem código de recuperação), cria um agora —
+            # de propósito só neste momento, na primeira ocorrência de
+            # verdade, e não já ao abrir a página.
+            if antena_numero is None and not participante_id:
+                novo_participante = criar_participante_automatico()
+                if novo_participante:
+                    participante_id = novo_participante["id"]
+                    codigo_recuperacao_novo = novo_participante.get(
+                        "codigo_recup")
+                    st.session_state["participante_id_ativo"] = participante_id
+                    streamlit_js_eval(
+                        js_expressions=(
+                            f"localStorage.setItem("
+                            f"'{CHAVE_LOCALSTORAGE_PARTICIPANTE}', "
+                            f"'{participante_id}')"
+                        ),
+                        key="salvar_participante_id_novo",
+                    )
+
             dados = {
                 "nome": nome,
                 "email": email.strip(),
@@ -496,6 +607,7 @@ if enviar:
             if antena_numero is not None:
                 dados["origem"] = "evento"
                 dados["antena_numero"] = antena_numero
+            if participante_id:
                 dados["participante_id"] = participante_id
 
             try:
@@ -534,6 +646,12 @@ if enviar:
                 "descricao": descricao,
                 "cid": cid,
                 "tx_hash": tx_hash,
+                # BLOCO 9: só vem preenchido quando um participante foi
+                # criado AGORA (primeira ocorrência do fluxo normal nesse
+                # dispositivo). Em recargas seguintes o comprovante antigo
+                # continua na sessão sem esse campo — por isso o `.get(...)`
+                # ao exibir, mais abaixo.
+                "codigo_recuperacao": codigo_recuperacao_novo,
             }
             st.balloons()
             # A pessoa acabou de enviar e a tela dela está no meio do
@@ -586,7 +704,25 @@ if comprovante:
         "precisar de login."
     )
 
-    if participante_id:
+    # BLOCO 9: se este comprovante acabou de criar um participante novo
+    # (fluxo normal, primeiro registro neste navegador), mostra o código de
+    # recuperação. É a única vez que ele aparece — depois disso o app conta
+    # com o localStorage deste mesmo navegador/dispositivo, e o código só
+    # volta a ser necessário se a pessoa trocar de aparelho ou limpar os
+    # dados do site.
+    codigo_recuperacao_exibir = comprovante.get("codigo_recuperacao")
+    if codigo_recuperacao_exibir:
+        st.info(
+            "🔑 **Guarde também este código de recuperação:** "
+            f"`{codigo_recuperacao_exibir}`\n\n"
+            "Ele identifica você como o mesmo cidadão em futuras "
+            "ocorrências, mesmo se trocar de celular ou computador ou "
+            "limpar os dados deste navegador. Neste aparelho, isso já "
+            "acontece automaticamente — o código é só para os outros "
+            "casos."
+        )
+
+    if participante_id and antena_numero is not None:
         # st.link_button sempre abre em nova aba (limitação do próprio
         # Streamlit, sem parâmetro pra mudar isso — pedido do Rafa em 19/09).
         # Trocado por um link HTML puro com target="_self", que abre na
