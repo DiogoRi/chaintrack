@@ -64,6 +64,13 @@ _REST_ANTENAS = f"{SUPABASE_URL}/rest/v1/antenas"
 # é /rest/v1/rpc/<nome-da-funcao> em vez de /rest/v1/<tabela>.
 _RPC_CRIAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/criar_participante"
 _RPC_RECUPERAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/recuperar_participante"
+# Pedido do Rafa (23/09): um jeito de ver, do celular, há quanto tempo o
+# worker parou — em vez de descobrir só quando alguém percebe. A tabela
+# worker_lease já é atualizada a cada volta do laço do worker desde o Bloco
+# 5 (campo visto_em); só faltava um jeito de ler isso de fora. Usa a mesma
+# chave secreta e o mesmo padrão REST do resto deste arquivo — não é uma
+# função nova no Postgres, então não mexe em nada que o Rafa consome.
+_REST_WORKER_LEASE = f"{SUPABASE_URL}/rest/v1/worker_lease"
 _HEADERS = {
     "apikey": SUPABASE_SECRET_KEY,
     "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
@@ -711,3 +718,63 @@ def adicionar_mensagem(r, texto, autor="cidadao", agora=None):
         "data": agora.strftime("%Y-%m-%d %H:%M:%S"),
     })
     return r
+
+
+def obter_status_worker():
+    """Pedido do Rafa (23/09): um "sinal de vida" do worker, legível de
+    qualquer lugar (inclusive do celular, numa página do Streamlit), pra
+    responder "há quanto tempo ele parou" em vez de só descobrir isso
+    quando alguém percebe que ocorrências pararam de sair da fila.
+
+    Lê a linha `worker_blockchain` da tabela `worker_lease`, que já é
+    renovada a cada volta do laço do worker desde o Bloco 5 (campo
+    `visto_em`) — nada precisou mudar no worker em si pra isso funcionar.
+
+    Devolve um dicionário:
+        {
+            "ok": True,
+            "owner": "...",              # qual processo/máquina é o dono
+            "visto_em": datetime,        # última vez que o worker se
+                                          # provou vivo (fuso do servidor)
+            "segundos_desde_ultima_volta": 12.3,
+        }
+    ou {"ok": False, "erro": "..."} se a linha não existir ou a consulta
+    falhar (por exemplo, Supabase fora do ar — que é, ele mesmo, um sinal
+    de alerta, só que sobre o banco, não sobre o worker).
+    """
+    try:
+        resp = requests.get(
+            _REST_WORKER_LEASE,
+            headers=_HEADERS,
+            params={
+                "nome": "eq.worker_blockchain",
+                "select": "owner,visto_em,lease_ate",
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        linhas = resp.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    if not linhas:
+        return {"ok": False, "erro": "linha 'worker_blockchain' não encontrada"}
+
+    linha = linhas[0]
+    visto_em_texto = linha.get("visto_em")
+    if not visto_em_texto:
+        return {"ok": False, "erro": "worker nunca registrou um heartbeat"}
+
+    try:
+        visto_em = datetime.fromisoformat(visto_em_texto.replace("Z", "+00:00"))
+        agora = datetime.now(visto_em.tzinfo)
+        segundos = (agora - visto_em).total_seconds()
+    except Exception as e:
+        return {"ok": False, "erro": f"data inválida vinda do banco: {e}"}
+
+    return {
+        "ok": True,
+        "owner": linha.get("owner"),
+        "visto_em": visto_em,
+        "segundos_desde_ultima_volta": segundos,
+    }

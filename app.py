@@ -713,13 +713,9 @@ if comprovante:
     codigo_recuperacao_exibir = comprovante.get("codigo_recuperacao")
     if codigo_recuperacao_exibir:
         st.info(
-            "🔑 **Guarde também este código de recuperação:** "
-            f"`{codigo_recuperacao_exibir}`\n\n"
-            "Ele identifica você como o mesmo cidadão em futuras "
-            "ocorrências, mesmo se trocar de celular ou computador ou "
-            "limpar os dados deste navegador. Neste aparelho, isso já "
-            "acontece automaticamente — o código é só para os outros "
-            "casos."
+            f"🔑 **Seu código de recuperação: `{codigo_recuperacao_exibir}`**\n\n"
+            "Guarde-o. É com ele que você recupera seu cadastro caso "
+            "troque de celular ou computador."
         )
 
     if participante_id and antena_numero is not None:
@@ -769,6 +765,23 @@ if comprovante:
         f"Foto no IPFS:           {link_foto}",
         f"Impressão digital:      {comprovante['cid']}",
         "",
+    ]
+
+    # BLOCO 9: só entra no texto quando um participante foi criado agora
+    # (primeira ocorrência do fluxo normal neste dispositivo) — mesma
+    # condição do aviso mostrado na tela, para o arquivo baixado carregar
+    # a mesma informação de quem só olhou a tela e não baixou nada.
+    if codigo_recuperacao_exibir:
+        linhas_texto += [
+            "SEU CÓDIGO DE RECUPERAÇÃO",
+            "-" * 46,
+            f"{codigo_recuperacao_exibir}",
+            "Guarde-o: é com ele que você recupera seu cadastro caso",
+            "troque de celular ou computador.",
+            "",
+        ]
+
+    linhas_texto += [
         "COMO ACOMPANHAR",
         "-" * 46,
         "Acesse https://chaintrack.streamlit.app, vá em",
