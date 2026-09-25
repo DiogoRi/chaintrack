@@ -7,3 +7,8 @@ DePIN Urbano - Sobre o Projeto.pdf
 
 *.mp3
 OUVIR_*.txt
+
+# Placeholders que o macOS cria para arquivo guardado so no iCloud (nao baixado
+# no disco) -- nao e conteudo do projeto, so aparece no Source Control por
+# causa disso (achado em 25/09, olhando ".DePIN Urbano - Sobre o Projeto.mp3.icloud").
+*.icloud
