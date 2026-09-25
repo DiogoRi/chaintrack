@@ -16,7 +16,6 @@ from ocorrencias import (
     buscar_antena_por_slug,
     buscar_endereco_por_coordenada,
     criar_participante_automatico,
-    recuperar_participante_por_codigo,
 )
 from streamlit_js_eval import get_geolocation, streamlit_js_eval
 
@@ -271,13 +270,19 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 aplicar_tema()
-st.title("📡 DePIN Urbano")
+# Ajuste pedido pelo Diogo (25/09): "Registre uma ocorrência" ficava solto,
+# como se fosse uma seção separada e sem relação com o título. Virou um
+# subtítulo colado ao título — mesmo padrão de título+subtítulo já usado nas
+# outras páginas (ex.: "Acompanhar ocorrência") — em vez de um st.subheader()
+# isolado mais abaixo na página.
+st.markdown("<p class='titulo-sobre'>📡 DePIN Urbano</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitulo-sobre'>Registre uma ocorrência</p>",
+            unsafe_allow_html=True)
 st.markdown(
     "<p class='frase-impacto'>Seja um cidadão participativo e ajude a "
     "construir uma cidade melhor</p>",
     unsafe_allow_html=True,
 )
-st.subheader("Registre uma ocorrência")
 
 # ===========================================================================
 # BLOCO 9: identidade do cidadão no fluxo normal (fora da gincana)
@@ -295,12 +300,19 @@ st.subheader("Registre uma ocorrência")
 #      localStorage (streamlit_js_eval, a mesma biblioteca já usada desde o
 #      Bloco 3-B pra geolocalização), lido sozinho, uma vez, quando a pessoa
 #      chega numa aba nova;
-#   3) manual, escondida num expander — um código de recuperação, pra quem
-#      troca de aparelho e perdeu o localStorage.
-# Se nenhuma das três achar nada, um participante novo só é criado na hora
+# Se nenhuma das duas achar nada, um participante novo só é criado na hora
 # de enviar a ocorrência (lá embaixo, dentro do "if enviar:") — de propósito
 # na primeira ocorrência, não já na visita, pra não sobrar participante
 # "fantasma" de quem só passou pra olhar o formulário.
+#
+# Ajuste pedido pelo Diogo (25/09): existia uma terceira camada aqui — um
+# expander manual "Já registrou antes? Recupere o seu painel" — só que
+# misturado bem em cima do formulário de registro, dava a impressão de ser
+# uma opção DO registro, quando na verdade é sobre outra coisa (entrar numa
+# conta já existente). Essa recuperação manual saiu daqui e agora mora só na
+# página "Meu Painel", com uma explicação mais clara. As duas telas usam a
+# MESMA chave de localStorage, então recuperar em qualquer uma resolve para
+# as duas — só que agora só tem UM lugar perguntando isso, em vez de dois.
 #
 # Precisa vir DEPOIS do st.set_page_config() logo acima: streamlit_js_eval é
 # um componente de verdade (não um widget nativo do Streamlit), e chamá-lo
@@ -335,34 +347,6 @@ if antena_numero is None:
                 if resultado_local != _SEM_ID_SALVO:
                     participante_id = resultado_local
                     st.session_state["participante_id_ativo"] = participante_id
-
-    if not participante_id:
-        with st.expander("Já registrou antes? Recupere o seu painel"):
-            codigo_digitado = st.text_input(
-                "Código de recuperação",
-                placeholder="Ex.: RDRMH65X",
-                key="codigo_recuperacao_input",
-            )
-            if st.button("Recuperar", key="botao_recuperar_participante"):
-                participante_recuperado = recuperar_participante_por_codigo(
-                    codigo_digitado)
-                if participante_recuperado:
-                    participante_id = participante_recuperado["id"]
-                    st.session_state["participante_id_ativo"] = participante_id
-                    streamlit_js_eval(
-                        js_expressions=(
-                            f"localStorage.setItem("
-                            f"'{CHAVE_LOCALSTORAGE_PARTICIPANTE}', "
-                            f"'{participante_id}')"
-                        ),
-                        key="salvar_participante_id_recuperado",
-                    )
-                    st.success(
-                        "Painel recuperado! Pode continuar e registrar sua "
-                        "ocorrência.")
-                else:
-                    st.error(
-                        "Código não encontrado. Confira e tente de novo.")
 
 TIPOS_LOGRADOURO = [
     "Rua", "Avenida", "Alameda", "Travessa", "Praça",

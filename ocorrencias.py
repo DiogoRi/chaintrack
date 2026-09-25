@@ -64,6 +64,24 @@ _REST_ANTENAS = f"{SUPABASE_URL}/rest/v1/antenas"
 # é /rest/v1/rpc/<nome-da-funcao> em vez de /rest/v1/<tabela>.
 _RPC_CRIAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/criar_participante"
 _RPC_RECUPERAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/recuperar_participante"
+# BLOCO 9 (vitrine, 25/09 — corrigido mais tarde no mesmo dia): a área
+# pessoal do cidadão comum (obter_painel_cidadao, mais abaixo) tentou
+# primeiro reaproveitar a função `painel(p_id)` que o Rafa já usa no React
+# desde 18/09. Só que `painel()` filtra `origem = 'evento'` em tudo o que
+# devolve — de propósito, para o ranking da gincana nunca se misturar com
+# ocorrências do fluxo normal (ver o comentário na própria função, no
+# Supabase). Resultado: para o cidadão comum (origem sempre 'normal'),
+# `painel()` sempre devolvia 0 CP e 0 ocorrências, mesmo com tudo certo no
+# banco — só descoberto testando de ponta a ponta e comparando com o banco
+# linha por linha.
+#
+# A correção consulta as tabelas direto (constante logo abaixo), com o
+# filtro ESPELHADO: `origem = 'normal'` em vez de `'evento'`. `painel()`
+# em si não foi tocada — o Rafa continua recebendo dela exatamente o que
+# sempre recebeu (REGRA QUE NÃO SE QUEBRA). Os dois painéis leem a MESMA
+# tabela `ocorrencias`, cada um só a fatia dele; não criamos nenhuma
+# função nova no banco.
+_REST_PARTICIPANTES = f"{SUPABASE_URL}/rest/v1/participantes"
 # Pedido do Rafa (23/09): um jeito de ver, do celular, há quanto tempo o
 # worker parou — em vez de descobrir só quando alguém percebe. A tabela
 # worker_lease já é atualizada a cada volta do laço do worker desde o Bloco
@@ -500,6 +518,90 @@ def recuperar_participante_por_codigo(codigo):
     if resultado.get("ok"):
         return resultado["participante"]
     return None
+
+
+def obter_painel_cidadao(participante_id):
+    """BLOCO 9 (vitrine): dados da área pessoal do cidadão comum — CP
+    acumulado, apelido interno (nunca mostrado) e a lista de ocorrências
+    dele, com status já traduzido para o vocabulário do app
+    ('recebida'/'em_andamento'/'concluida', o mesmo de STATUS_LABELS).
+
+    ATUALIZADO em 25/09 (correção, mais tarde no mesmo dia): não usa mais a
+    RPC `painel()` — ela filtra `origem = 'evento'` em tudo (decisão certa
+    para a gincana, ver comentário da função no Supabase), então nunca
+    devolvia nada para o cidadão comum, cujas ocorrências são sempre
+    'normal'. Agora consulta `participantes` e `ocorrencias` direto, com o
+    filtro espelhado (`origem = 'normal'`). Não cria função nova no banco,
+    e `painel()` continua intocada — o que o Rafa consome dela não muda em
+    nada (REGRA QUE NÃO SE QUEBRA). `pontos_gincana` fica sempre 0 aqui de
+    propósito: pontos de gincana são assunto do `painel()`, não deste
+    painel.
+
+    Devolve:
+        {"ok": True, "codigo_recup": "...", "cp": 3, "pontos_gincana": 0,
+         "ocorrencias": [{"tipo":..., "status":..., "cp_ganho":...,
+                           "tx_hash":..., "criado_em": "AAAA-MM-DD HH:MM:SS"},
+                          ...]}   # mais recente primeiro
+    ou {"ok": False, "erro": "..."} se o id não existir ou a consulta falhar.
+    """
+    if not participante_id:
+        return {"ok": False, "erro": "sem participante_id"}
+
+    try:
+        resp_participante = requests.get(
+            _REST_PARTICIPANTES,
+            headers=_HEADERS,
+            params={
+                "id": f"eq.{participante_id}",
+                "select": "id,codigo_recup",
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_participante.raise_for_status()
+        linhas_participante = resp_participante.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    if not linhas_participante:
+        return {"ok": False, "erro": "participante não encontrado"}
+    participante = linhas_participante[0]
+
+    try:
+        resp_ocorrencias = requests.get(
+            _REST,
+            headers=_HEADERS,
+            params={
+                "participante_id": f"eq.{participante_id}",
+                "origem": "eq.normal",
+                "select": ("tipo,status,cp_ganho,tx_hash_registro,"
+                           "tx_hash_conclusao,criado_em"),
+                "order": "criado_em.desc",
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_ocorrencias.raise_for_status()
+        brutas = resp_ocorrencias.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    ocorrencias = [
+        {
+            "tipo": o.get("tipo"),
+            "status": _STATUS_DO_BANCO.get(o.get("status"), o.get("status")),
+            "cp_ganho": o.get("cp_ganho") or 0,
+            "tx_hash": o.get("tx_hash_conclusao") or o.get("tx_hash_registro"),
+            "criado_em": _iso_para_carimbo(o.get("criado_em")),
+        }
+        for o in brutas
+    ]
+
+    return {
+        "ok": True,
+        "codigo_recup": participante.get("codigo_recup"),
+        "cp": sum(o["cp_ganho"] for o in ocorrencias),
+        "pontos_gincana": 0,
+        "ocorrencias": ocorrencias,
+    }
 
 
 def buscar_endereco_por_coordenada(lat, lon):
