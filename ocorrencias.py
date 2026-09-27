@@ -46,6 +46,12 @@ load_dotenv(BASE_DIR / ".env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SECRET_KEY = os.getenv("SUPABASE_SECRET_KEY")
+# Só usados por obter_saldo_pol(), mais abaixo (pedido do Rafa, 25/09) — lidos
+# aqui em cima junto com o resto do .env, mas sem exigir os dois (diferente
+# de SUPABASE_URL/KEY, sem eles o arquivo inteiro para de funcionar; sem
+# RPC_URL/WALLET_ADDRESS, só a checagem de saldo fica indisponível).
+RPC_URL = os.getenv("RPC_URL")
+WALLET_ADDRESS = os.getenv("WALLET_ADDRESS")
 
 if not SUPABASE_URL or not SUPABASE_SECRET_KEY:
     raise RuntimeError(
@@ -89,6 +95,10 @@ _REST_PARTICIPANTES = f"{SUPABASE_URL}/rest/v1/participantes"
 # chave secreta e o mesmo padrão REST do resto deste arquivo — não é uma
 # função nova no Postgres, então não mexe em nada que o Rafa consome.
 _REST_WORKER_LEASE = f"{SUPABASE_URL}/rest/v1/worker_lease"
+# Tem que bater com RETRIES_MAX em worker_blockchain.py — usado só por
+# obter_fila_pendente() (mais abaixo) pra separar "ainda tentando" de
+# "o worker já desistiu, precisa de olhar humano".
+_RETRIES_MAX_WORKER = 3
 _HEADERS = {
     "apikey": SUPABASE_SECRET_KEY,
     "Authorization": f"Bearer {SUPABASE_SECRET_KEY}",
@@ -880,3 +890,208 @@ def obter_status_worker():
         "visto_em": visto_em,
         "segundos_desde_ultima_volta": segundos,
     }
+
+
+def obter_saldo_pol():
+    """Pedido do Rafa (25/09), depois de apontar uma lacuna real no
+    obter_status_worker() acima: aquela função só prova que o PROCESSO do
+    worker está de pé (o heartbeat é renovado antes de qualquer tentativa
+    de transação, então continua batendo mesmo se toda transação estiver
+    falhando por falta de gás) — não prova que o TRABALHO está de fato
+    acontecendo. Saldo de POL caindo é o alerta que chega ANTES de faltar
+    gás de verdade, em vez de só descobrir quando uma transação já começou
+    a falhar.
+
+    Import do web3 é feito aqui dentro, não lá em cima do arquivo, de
+    propósito: esta é a única função deste arquivo que precisa dele, e
+    todas as outras páginas (Acompanhar Ocorrência, Dashboard, Meu Painel,
+    o próprio formulário) não precisam pagar o custo de carregar essa
+    biblioteca à toa a cada carregamento de página.
+
+    Só lê o saldo (chamada gratuita, sem gastar gás, sem tocar em
+    contrato nenhum) — nunca assina nem manda nada.
+
+    Devolve {"ok": True, "saldo_pol": 4.4231} ou {"ok": False, "erro": "..."}.
+    """
+    if not RPC_URL or not WALLET_ADDRESS:
+        return {"ok": False, "erro": "RPC_URL e/ou WALLET_ADDRESS não configurados no .env"}
+    try:
+        from web3 import Web3
+        w3 = Web3(Web3.HTTPProvider(RPC_URL))
+        saldo_wei = w3.eth.get_balance(Web3.to_checksum_address(WALLET_ADDRESS))
+        return {"ok": True, "saldo_pol": saldo_wei / 10**18}
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar a Amoy: {e}"}
+
+
+def obter_fila_pendente():
+    """Pedido do Rafa (25/09) — o outro lado da mesma lacuna descrita em
+    obter_saldo_pol() acima: quantas ocorrências (de qualquer origem, igual
+    ao worker) estão esperando o worker confirmar na blockchain, e há
+    quanto tempo a mais antiga está esperando. Uma "última volta" recente
+    (obter_status_worker) junto com uma fila que só cresce é o sinal de que
+    o worker está vivo mas travado — sem essa segunda métrica, a página só
+    mostraria verde o tempo todo.
+
+    Consulta só a tabela `ocorrencias`, com os mesmos critérios que o
+    próprio worker usa pra escolher a próxima candidata (ver
+    _enviar_um_registro_pendente/_enviar_uma_conclusao_pendente em
+    worker_blockchain.py) — nenhuma função nova no Postgres, nenhuma
+    mudança no que o Rafa consome.
+
+    Devolve:
+        {"ok": True, "total_pendentes": 3, "travadas": 1,
+         "segundos_mais_antiga": 612.4}   # None se não houver nenhuma pendente
+    ou {"ok": False, "erro": "..."}.
+
+    "travadas" = já bateram as _RETRIES_MAX_WORKER tentativas e o worker
+    desistiu (erro preenchido, não tenta mais sozinho) — sinal mais forte
+    de problema do que só "ainda na fila normal".
+    """
+    try:
+        resp_registro = requests.get(
+            _REST, headers=_HEADERS,
+            params={
+                "tx_hash_registro": "is.null",
+                "foto_falhou": "eq.false",   # senão conta foto que falhou de
+                                              # subir, que não é sobre a
+                                              # blockchain nem sobre o worker
+                "select": "id,criado_em,tentativas",
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_registro.raise_for_status()
+        pendentes_registro = resp_registro.json()
+
+        resp_conclusao = requests.get(
+            _REST, headers=_HEADERS,
+            params={
+                "status": "eq.concluido",
+                "tx_hash_conclusao": "is.null",
+                "select": "id,criado_em,tentativas",
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_conclusao.raise_for_status()
+        pendentes_conclusao = resp_conclusao.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    todas = pendentes_registro + pendentes_conclusao
+    travadas = sum(1 for o in todas if (o.get("tentativas") or 0) >= _RETRIES_MAX_WORKER)
+
+    segundos_mais_antiga = None
+    datas = [
+        datetime.fromisoformat(o["criado_em"].replace("Z", "+00:00"))
+        for o in todas if o.get("criado_em")
+    ]
+    if datas:
+        mais_antiga = min(datas)
+        agora = datetime.now(mais_antiga.tzinfo)
+        segundos_mais_antiga = (agora - mais_antiga).total_seconds()
+
+    return {
+        "ok": True,
+        "total_pendentes": len(todas),
+        "travadas": travadas,
+        "segundos_mais_antiga": segundos_mais_antiga,
+    }
+
+
+def listar_ocorrencias_travadas():
+    """Pedido do Diogo (25/09), depois de obter_fila_pendente() acima já
+    contar quantas ocorrências bateram o limite de tentativas do worker:
+    contar não bastava, porque travar não é só lentidão — pode ser um
+    problema real com aquela ocorrência específica (endereço inválido,
+    campo que o contrato rejeita, etc.). Por isso esta função não tenta
+    "destravar tudo de uma vez": ela só lista cada travada, com o motivo do
+    erro registrado, pra alguém abrir uma de cada vez e decidir se vale a
+    pena mandar de novo. Quem manda de novo é retentar_ocorrencia_travada(),
+    logo abaixo — nunca esta função, que só lê.
+
+    Mesmo critério de "travada" de obter_fila_pendente(): tentativas >=
+    _RETRIES_MAX_WORKER, ou seja, já bateu no limite que _candidatas() usa
+    em worker_blockchain.py (RETRIES_MAX) e o worker desistiu sozinho.
+
+    Devolve:
+        {"ok": True, "ocorrencias": [
+            {"protocolo": "...", "tipo": "...", "origem": "...",
+             "status": "recebida"|"em_andamento"|"concluida",
+             "criado_em": "AAAA-MM-DD HH:MM:SS", "tentativas": 3,
+             "erro": "...", "travada_em": "registro"|"conclusão"},
+            ...
+        ]}   # mais recente primeiro
+    ou {"ok": False, "erro": "..."} se a consulta falhar.
+
+    "status" já vem traduzido pro vocabulário do app (via _STATUS_DO_BANCO),
+    o mesmo que STATUS_LABELS nas telas já entende — quem chama isto não
+    precisa conhecer o vocabulário interno do banco.
+    """
+    campos = "protocolo,tipo,origem,status,criado_em,tentativas,erro"
+    try:
+        resp_registro = requests.get(
+            _REST, headers=_HEADERS,
+            params={
+                "tx_hash_registro": "is.null",
+                "foto_falhou": "eq.false",
+                "tentativas": f"gte.{_RETRIES_MAX_WORKER}",
+                "select": campos,
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_registro.raise_for_status()
+        travadas_registro = resp_registro.json()
+
+        resp_conclusao = requests.get(
+            _REST, headers=_HEADERS,
+            params={
+                "status": "eq.concluido",
+                "tx_hash_conclusao": "is.null",
+                "tentativas": f"gte.{_RETRIES_MAX_WORKER}",
+                "select": campos,
+            },
+            timeout=_TIMEOUT,
+        )
+        resp_conclusao.raise_for_status()
+        travadas_conclusao = resp_conclusao.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    def _traduzir(linha, travada_em):
+        return {
+            "protocolo": linha.get("protocolo"),
+            "tipo": linha.get("tipo"),
+            "origem": linha.get("origem"),
+            "status": _STATUS_DO_BANCO.get(linha.get("status"), linha.get("status")),
+            "criado_em": _iso_para_carimbo(linha.get("criado_em")),
+            "tentativas": linha.get("tentativas"),
+            "erro": linha.get("erro") or "(sem mensagem de erro registrada)",
+            "travada_em": travada_em,
+        }
+
+    resultado = (
+        [_traduzir(linha, "registro") for linha in travadas_registro]
+        + [_traduzir(linha, "conclusão") for linha in travadas_conclusao]
+    )
+    resultado.sort(key=lambda o: o["criado_em"], reverse=True)
+
+    return {"ok": True, "ocorrencias": resultado}
+
+
+def retentar_ocorrencia_travada(protocolo):
+    """Pedido do Diogo (25/09): reabre UMA ocorrência travada (escolhida à
+    mão, depois de olhar o erro em listar_ocorrencias_travadas()) para o
+    worker tentar de novo sozinho.
+
+    Não manda nenhuma transação daqui — só zera "tentativas" e limpa "erro",
+    que é exatamente o filtro que _candidatas() usa em worker_blockchain.py
+    (tentativas < RETRIES_MAX) pra decidir quem ainda pode ser tentado. Na
+    próxima volta do laço do worker (até INTERVALO_LOOP_SEG=5s depois), essa
+    ocorrência volta a ser candidata, como se fosse a primeira tentativa.
+
+    Importante: isto não julga SE vale a pena tentar de novo — quem decide
+    isso é a pessoa olhando o erro antes de chamar esta função. Reabrir sem
+    entender o motivo original só gasta mais três tentativas à toa (e mais
+    gás, se alguma delas chegar a sair).
+    """
+    atualizar_registro(protocolo, tentativas=0, erro=None)

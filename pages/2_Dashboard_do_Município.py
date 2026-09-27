@@ -37,8 +37,13 @@ from ocorrencias import (                      # noqa: E402
     data_curta,
     formatar_data,
     info_prazo,
+    listar_ocorrencias_travadas,
+    obter_fila_pendente,
+    obter_saldo_pol,
+    obter_status_worker,
     ordenar_por_data,
     protocolo_de,
+    retentar_ocorrencia_travada,
     salvar_registros,
     texto_prazo,
 )
@@ -90,316 +95,503 @@ def exigir_acesso():
 
 exigir_acesso()
 
-INTERVALO_MS = 2000
+aba_ocorrencias, aba_status = st.tabs(["📋 Ocorrências", "💓 Status do Worker"])
 
-registros = carregar_registros()
+with aba_ocorrencias:
+    INTERVALO_MS = 2000
 
-st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
+    registros = carregar_registros()
 
-st.markdown(
-    "<p class='titulo-dashboard'>🗺️ Dashboard do Município</p>",
-    unsafe_allow_html=True)
+    st_autorefresh(interval=INTERVALO_MS, key="auto_refresh_dashboard")
 
-
-st.markdown(
-    "<p class='subtitulo-dashboard'>Ocorrências registradas</p>",
-    unsafe_allow_html=True)
-
-if registros:
-    ativas_totais = [r for r in registros if not r.get("arquivada")]
-    atrasadas = [r for r in ativas_totais if info_prazo(r)["atrasada"]]
-
-    col_a, col_b = st.columns([3, 2])
-    with col_a:
-        st.write(f"**{len(registros)} ocorrência(s) registrada(s)**")
-    with col_b:
-        if atrasadas:
-            st.error(f"⏰ {len(atrasadas)} com prazo vencido")
-
-    lats = [r["latitude"] for r in registros]
-    lons = [r["longitude"] for r in registros]
-    centro = [sum(lats) / len(lats), sum(lons) / len(lons)]
-
-    mapa = folium.Map(location=centro, zoom_start=12)
-
-    if len(registros) > 1:
-        mapa.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
-
-    for r in registros:
-        status = r.get("status", "recebida")
-        popup_html = f"""
-        <b>{r.get('descricao', 'Sem descrição')}</b><br>
-        Protocolo: {protocolo_de(r)}<br>
-        Status: {STATUS_LABELS.get(status, status)}<br>
-        Endereço: {r.get('endereco', 'N/A')}<br>
-        Data: {r.get('data', 'N/A')}<br>
-        CID: <a href='https://gateway.pinata.cloud/ipfs/{r.get("cid", "")}' target='_blank'>{r.get('cid', 'N/A')[:20]}...</a>
-        """
-        folium.Marker(
-            location=[r["latitude"], r["longitude"]],
-            popup=folium.Popup(popup_html, max_width=300),
-            icon=folium.Icon(
-                color=STATUS_CORES_MAPA.get(status, "gray"),
-                icon="exclamation-sign"
-            )
-        ).add_to(mapa)
-
-    st_folium(mapa, width=900, height=500, key="mapa_depin")
-
-    st.markdown("### Ocorrências e status")
-    # Texto normal em vez de legenda: esta instrução é operacional (explica o
-    # que acontece ao concluir) e precisa ser lida sem esforço na projeção.
     st.markdown(
-        "Atualize o status manualmente conforme o andamento. Ao passar para "
-        "**Em andamento**, começa a contar o prazo de execução e o cidadão "
-        "passa a ver a data prevista na consulta por protocolo. Ao marcar como "
-        "**Concluída**, o status já é salvo na hora; o registro da conclusão "
-        "na blockchain e o envio do token CP (Cidadão Participativo) "
-        "acontecem em seguida, em segundo plano, e o comprovante aparece "
-        "aqui assim que estiver pronto."
-    )
+        "<p class='titulo-dashboard'>🗺️ Dashboard do Município</p>",
+        unsafe_allow_html=True)
 
-    def mostrar_ocorrencia(r):
-        """Desenha o cartão de uma ocorrência, com os detalhes e os controles
-        de atendimento. Usado pelos quatro grupos."""
-        status_atual = r.get("status", "recebida")
-        dados_prazo = info_prazo(r)
 
-        # Protocolo e data vêm primeiro: identificam a ocorrência sem
-        # ambiguidade. A descrição entra encurtada, só como pista — assim
-        # todas as linhas ficam com a mesma altura, em vez de umas com uma
-        # linha e outras com quatro.
-        desc = r.get("descricao", "Sem descrição")
-        if len(desc) > 40:
-            desc = desc[:40].rstrip() + "…"
+    st.markdown(
+        "<p class='subtitulo-dashboard'>Ocorrências registradas</p>",
+        unsafe_allow_html=True)
 
-        # O aviso de atraso entra no título, não dentro do cartão: quem abre
-        # o painel precisa ver o que está vencido sem ter que expandir tudo.
-        alerta = "⏰ " if dados_prazo["atrasada"] else ""
-        nao_lidas = sum(1 for m in r.get("mensagens", [])
-                        if m.get("autor") == "cidadao")
-        aviso_msg = f"  💬 {nao_lidas}" if nao_lidas else ""
+    if registros:
+        ativas_totais = [r for r in registros if not r.get("arquivada")]
+        atrasadas = [r for r in ativas_totais if info_prazo(r)["atrasada"]]
 
-        titulo = (f"{alerta}{STATUS_LABELS.get(status_atual, status_atual)}  "
-                  f"{protocolo_de(r)}  ·  {data_curta(r)}  ·  {desc}{aviso_msg}")
+        col_a, col_b = st.columns([3, 2])
+        with col_a:
+            st.write(f"**{len(registros)} ocorrência(s) registrada(s)**")
+        with col_b:
+            if atrasadas:
+                st.error(f"⏰ {len(atrasadas)} com prazo vencido")
 
-        with st.expander(titulo):
-            # ---- Prazo ----
-            # publico=False: aqui quem lê é a equipe que atende, não o
-            # cidadão. A frase explicativa sobre o que vai acontecer com a
-            # ocorrência não faz sentido para quem é o responsável por
-            # fazer isso acontecer.
-            frase = texto_prazo(r, publico=False)
-            if status_atual == "concluida":
-                st.success(frase)
-            elif dados_prazo["atrasada"]:
-                st.error(frase)
-            else:
-                st.info(frase)
+        lats = [r["latitude"] for r in registros]
+        lons = [r["longitude"] for r in registros]
+        centro = [sum(lats) / len(lats), sum(lons) / len(lons)]
 
-            st.write(f"**Protocolo:** `{protocolo_de(r)}`")
-            st.write(f"**Nome:** {r.get('nome', 'N/A')}")
-            if r.get("email"):
-                st.write(f"**E-mail:** {r['email']}")
-            st.write(f"**Endereço:** {r.get('endereco', 'N/A')}")
-            st.write(f"**Descrição:** {r.get('descricao', 'N/A')}")
-            st.write(f"**Data:** {r.get('data', 'N/A')}")
-            st.write(f"**Carteira:** {r.get('wallet') or '_não informada_'}")
-            st.write(
-                f"**Equipe responsável:** {r.get('setor', 'Não atribuído')}")
+        mapa = folium.Map(location=centro, zoom_start=12)
 
-            if r.get("cid"):
-                link_foto = f"https://gateway.pinata.cloud/ipfs/{r['cid']}"
-                st.image(link_foto, width=300)
-                # O link fica sempre disponível: o gateway do IPFS às vezes
-                # demora ou não responde, e nesse caso a imagem acima não
-                # carrega. Com o link, a foto continua acessível.
-                st.caption(
-                    f"🔐 Impressão digital da foto: `{r['cid']}` — "
-                    f"[abrir a imagem]({link_foto})")
+        if len(registros) > 1:
+            mapa.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
 
-            # Prova pública do registro. Se ela não existe, o dashboard diz
-            # isso com todas as letras: uma ocorrência que ficou só no arquivo
-            # local não tem o valor central que o projeto promete.
-            if r.get("tx_registro"):
-                st.markdown(
-                    f"**Comprovante do registro:** "
-                    f"[abrir no Polygonscan]"
-                    f"(https://amoy.polygonscan.com/tx/{r['tx_registro']})"
+        for r in registros:
+            status = r.get("status", "recebida")
+            popup_html = f"""
+            <b>{r.get('descricao', 'Sem descrição')}</b><br>
+            Protocolo: {protocolo_de(r)}<br>
+            Status: {STATUS_LABELS.get(status, status)}<br>
+            Endereço: {r.get('endereco', 'N/A')}<br>
+            Data: {r.get('data', 'N/A')}<br>
+            CID: <a href='https://gateway.pinata.cloud/ipfs/{r.get("cid", "")}' target='_blank'>{r.get('cid', 'N/A')[:20]}...</a>
+            """
+            folium.Marker(
+                location=[r["latitude"], r["longitude"]],
+                popup=folium.Popup(popup_html, max_width=300),
+                icon=folium.Icon(
+                    color=STATUS_CORES_MAPA.get(status, "gray"),
+                    icon="exclamation-sign"
                 )
-            elif not str(r.get("id", "")).startswith("legacy-"):
-                st.warning(
-                    "Esta ocorrência não tem prova on-chain: a gravação na "
-                    "blockchain falhou no momento do envio. O registro existe "
-                    "aqui, mas não é auditável publicamente."
-                )
+            ).add_to(mapa)
 
-            if r.get("token_tx"):
-                st.markdown(
-                    f"**Comprovante de conclusão e recompensa:** "
-                    f"[abrir no Polygonscan](https://amoy.polygonscan.com/tx/{r['token_tx']})"
-                )
-                st.caption(
-                    "⛓️ A conclusão e o envio do token saíram na mesma operação — "
-                    "uma não existe sem a outra."
-                )
+        st_folium(mapa, width=900, height=500, key="mapa_depin")
 
-            # ---- Controles de atendimento ----
-            st.markdown("---")
-            st.markdown("**Atendimento**")
+        st.markdown("### Ocorrências e status")
+        # Texto normal em vez de legenda: esta instrução é operacional (explica o
+        # que acontece ao concluir) e precisa ser lida sem esforço na projeção.
+        st.markdown(
+            "Atualize o status manualmente conforme o andamento. Ao passar para "
+            "**Em andamento**, começa a contar o prazo de execução e o cidadão "
+            "passa a ver a data prevista na consulta por protocolo. Ao marcar como "
+            "**Concluída**, o status já é salvo na hora; o registro da conclusão "
+            "na blockchain e o envio do token CP (Cidadão Participativo) "
+            "acontecem em seguida, em segundo plano, e o comprovante aparece "
+            "aqui assim que estiver pronto."
+        )
 
-            col1, col2 = st.columns(2)
-            with col1:
-                label_escolhido = st.selectbox(
-                    "Situação",
-                    options=list(STATUS_LABELS.values()),
-                    index=list(STATUS_LABELS.keys()).index(status_atual),
-                    key=f"status_{r['id']}",
-                )
-                setor_atual = r.get("setor", SETORES[0])
-                if setor_atual not in SETORES:
-                    setor_atual = SETORES[0]
-                setor_escolhido = st.selectbox(
-                    "Equipe responsável",
-                    options=SETORES,
-                    index=SETORES.index(setor_atual),
-                    key=f"setor_{r['id']}",
-                )
-            with col2:
-                prazo_escolhido = st.number_input(
-                    "Prazo de execução (dias úteis)",
-                    min_value=1,
-                    max_value=180,
-                    value=int(r.get("prazo_dias") or PRAZO_PADRAO_DIAS),
-                    step=1,
-                    key=f"prazo_{r['id']}",
-                )
-                st.caption(
-                    f"O padrão é {PRAZO_PADRAO_DIAS} dias úteis, contados do "
-                    "encaminhamento à equipe. Ajuste quando o serviço exigir "
-                    "mais ou menos tempo."
-                )
-                if r.get("data_andamento"):
+        def mostrar_ocorrencia(r):
+            """Desenha o cartão de uma ocorrência, com os detalhes e os controles
+            de atendimento. Usado pelos quatro grupos."""
+            status_atual = r.get("status", "recebida")
+            dados_prazo = info_prazo(r)
+
+            # Protocolo e data vêm primeiro: identificam a ocorrência sem
+            # ambiguidade. A descrição entra encurtada, só como pista — assim
+            # todas as linhas ficam com a mesma altura, em vez de umas com uma
+            # linha e outras com quatro.
+            desc = r.get("descricao", "Sem descrição")
+            if len(desc) > 40:
+                desc = desc[:40].rstrip() + "…"
+
+            # O aviso de atraso entra no título, não dentro do cartão: quem abre
+            # o painel precisa ver o que está vencido sem ter que expandir tudo.
+            alerta = "⏰ " if dados_prazo["atrasada"] else ""
+            nao_lidas = sum(1 for m in r.get("mensagens", [])
+                            if m.get("autor") == "cidadao")
+            aviso_msg = f"  💬 {nao_lidas}" if nao_lidas else ""
+
+            titulo = (f"{alerta}{STATUS_LABELS.get(status_atual, status_atual)}  "
+                      f"{protocolo_de(r)}  ·  {data_curta(r)}  ·  {desc}{aviso_msg}")
+
+            with st.expander(titulo):
+                # ---- Prazo ----
+                # publico=False: aqui quem lê é a equipe que atende, não o
+                # cidadão. A frase explicativa sobre o que vai acontecer com a
+                # ocorrência não faz sentido para quem é o responsável por
+                # fazer isso acontecer.
+                frase = texto_prazo(r, publico=False)
+                if status_atual == "concluida":
+                    st.success(frase)
+                elif dados_prazo["atrasada"]:
+                    st.error(frase)
+                else:
+                    st.info(frase)
+
+                st.write(f"**Protocolo:** `{protocolo_de(r)}`")
+                st.write(f"**Nome:** {r.get('nome', 'N/A')}")
+                if r.get("email"):
+                    st.write(f"**E-mail:** {r['email']}")
+                st.write(f"**Endereço:** {r.get('endereco', 'N/A')}")
+                st.write(f"**Descrição:** {r.get('descricao', 'N/A')}")
+                st.write(f"**Data:** {r.get('data', 'N/A')}")
+                st.write(f"**Carteira:** {r.get('wallet') or '_não informada_'}")
+                st.write(
+                    f"**Equipe responsável:** {r.get('setor', 'Não atribuído')}")
+
+                if r.get("cid"):
+                    link_foto = f"https://gateway.pinata.cloud/ipfs/{r['cid']}"
+                    st.image(link_foto, width=300)
+                    # O link fica sempre disponível: o gateway do IPFS às vezes
+                    # demora ou não responde, e nesse caso a imagem acima não
+                    # carrega. Com o link, a foto continua acessível.
                     st.caption(
-                        "Encaminhada em "
-                        f"**{formatar_data(r['data_andamento'])}**."
+                        f"🔐 Impressão digital da foto: `{r['cid']}` — "
+                        f"[abrir a imagem]({link_foto})")
+
+                # Prova pública do registro. Se ela não existe, o dashboard diz
+                # isso com todas as letras: uma ocorrência que ficou só no arquivo
+                # local não tem o valor central que o projeto promete.
+                if r.get("tx_registro"):
+                    st.markdown(
+                        f"**Comprovante do registro:** "
+                        f"[abrir no Polygonscan]"
+                        f"(https://amoy.polygonscan.com/tx/{r['tx_registro']})"
+                    )
+                elif not str(r.get("id", "")).startswith("legacy-"):
+                    st.warning(
+                        "Esta ocorrência não tem prova on-chain: a gravação na "
+                        "blockchain falhou no momento do envio. O registro existe "
+                        "aqui, mas não é auditável publicamente."
                     )
 
-            atualizar = st.button("Atualizar", key=f"upd_{r['id']}")
+                if r.get("token_tx"):
+                    st.markdown(
+                        f"**Comprovante de conclusão e recompensa:** "
+                        f"[abrir no Polygonscan](https://amoy.polygonscan.com/tx/{r['token_tx']})"
+                    )
+                    st.caption(
+                        "⛓️ A conclusão e o envio do token saíram na mesma operação — "
+                        "uma não existe sem a outra."
+                    )
 
-            if atualizar:
-                novo_status = LABEL_PARA_STATUS[label_escolhido]
-                mudou_status = novo_status != status_atual
-                mudou_setor = setor_escolhido != r.get("setor")
-                mudou_prazo = int(prazo_escolhido) != int(
-                    r.get("prazo_dias") or PRAZO_PADRAO_DIAS)
+                # ---- Controles de atendimento ----
+                st.markdown("---")
+                st.markdown("**Atendimento**")
 
-                if not (mudou_status or mudou_setor or mudou_prazo):
-                    st.info("Nada mudou nesta ocorrência.")
+                col1, col2 = st.columns(2)
+                with col1:
+                    label_escolhido = st.selectbox(
+                        "Situação",
+                        options=list(STATUS_LABELS.values()),
+                        index=list(STATUS_LABELS.keys()).index(status_atual),
+                        key=f"status_{r['id']}",
+                    )
+                    setor_atual = r.get("setor", SETORES[0])
+                    if setor_atual not in SETORES:
+                        setor_atual = SETORES[0]
+                    setor_escolhido = st.selectbox(
+                        "Equipe responsável",
+                        options=SETORES,
+                        index=SETORES.index(setor_atual),
+                        key=f"setor_{r['id']}",
+                    )
+                with col2:
+                    prazo_escolhido = st.number_input(
+                        "Prazo de execução (dias úteis)",
+                        min_value=1,
+                        max_value=180,
+                        value=int(r.get("prazo_dias") or PRAZO_PADRAO_DIAS),
+                        step=1,
+                        key=f"prazo_{r['id']}",
+                    )
+                    st.caption(
+                        f"O padrão é {PRAZO_PADRAO_DIAS} dias úteis, contados do "
+                        "encaminhamento à equipe. Ajuste quando o serviço exigir "
+                        "mais ou menos tempo."
+                    )
+                    if r.get("data_andamento"):
+                        st.caption(
+                            "Encaminhada em "
+                            f"**{formatar_data(r['data_andamento'])}**."
+                        )
+
+                atualizar = st.button("Atualizar", key=f"upd_{r['id']}")
+
+                if atualizar:
+                    novo_status = LABEL_PARA_STATUS[label_escolhido]
+                    mudou_status = novo_status != status_atual
+                    mudou_setor = setor_escolhido != r.get("setor")
+                    mudou_prazo = int(prazo_escolhido) != int(
+                        r.get("prazo_dias") or PRAZO_PADRAO_DIAS)
+
+                    if not (mudou_status or mudou_setor or mudou_prazo):
+                        st.info("Nada mudou nesta ocorrência.")
+                    else:
+                        r["setor"] = setor_escolhido
+                        r["prazo_dias"] = int(prazo_escolhido)
+                        if mudou_status:
+                            aplicar_status(r, novo_status)
+                        salvar_registros(registros)
+                        st.rerun()
+
+                # ---- Mensagens ----
+                st.markdown("---")
+                st.markdown("**Mensagens**")
+
+                mensagens = r.get("mensagens", [])
+                if mensagens:
+                    for m in mensagens:
+                        quem = ("Cidadão" if m.get("autor") == "cidadao"
+                                else "Equipe do município")
+                        quando = data_curta({"data": m.get("data", "")})
+                        st.markdown(f"**{quem}** · {quando}")
+                        st.markdown(f"> {m.get('texto', '')}")
                 else:
-                    r["setor"] = setor_escolhido
-                    r["prazo_dias"] = int(prazo_escolhido)
-                    if mudou_status:
-                        aplicar_status(r, novo_status)
-                    salvar_registros(registros)
-                    st.rerun()
+                    st.caption("Nenhuma mensagem nesta ocorrência.")
 
-            # ---- Mensagens ----
-            st.markdown("---")
-            st.markdown("**Mensagens**")
+                resposta = st.text_area(
+                    "Responder ao cidadão",
+                    key=f"resp_{r['id']}",
+                    height=90,
+                    placeholder="A equipe esteve no local hoje e o serviço foi "
+                                "programado para a próxima semana.",
+                )
+                if st.button("Enviar resposta", key=f"envresp_{r['id']}"):
+                    if resposta.strip():
+                        adicionar_mensagem(r, resposta, autor="municipio")
+                        salvar_registros(registros)
+                        st.rerun()
+                    else:
+                        st.warning("Escreva a resposta antes de enviar.")
 
-            mensagens = r.get("mensagens", [])
-            if mensagens:
-                for m in mensagens:
-                    quem = ("Cidadão" if m.get("autor") == "cidadao"
-                            else "Equipe do município")
-                    quando = data_curta({"data": m.get("data", "")})
-                    st.markdown(f"**{quem}** · {quando}")
-                    st.markdown(f"> {m.get('texto', '')}")
-            else:
-                st.caption("Nenhuma mensagem nesta ocorrência.")
+                # ---- Arquivar / restaurar ----
+                # Arquivar em vez de excluir: nada é apagado, a ocorrência apenas
+                # sai da vista do dia a dia. Isso é coerente com o próprio projeto,
+                # em que o registro na blockchain é permanente por definição.
+                st.markdown("---")
+                if r.get("arquivada"):
+                    if st.button("↩️ Restaurar", key=f"rest_{r['id']}"):
+                        r["arquivada"] = False
+                        salvar_registros(registros)
+                        st.rerun()
+                else:
+                    if st.button("🗂️ Arquivar", key=f"arq_{r['id']}"):
+                        r["arquivada"] = True
+                        salvar_registros(registros)
+                        st.rerun()
 
-            resposta = st.text_area(
-                "Responder ao cidadão",
-                key=f"resp_{r['id']}",
-                height=90,
-                placeholder="A equipe esteve no local hoje e o serviço foi "
-                            "programado para a próxima semana.",
+        ativas = [r for r in registros if not r.get("arquivada")]
+
+        recebidas = ordenar_por_data(
+            [r for r in ativas if r.get("status", "recebida") == "recebida"])
+        em_andamento = ordenar_por_data(
+            [r for r in ativas if r.get("status") == "em_andamento"])
+        concluidas = ordenar_por_data(
+            [r for r in ativas if r.get("status") == "concluida"])
+        arquivadas = ordenar_por_data(
+            [r for r in registros if r.get("arquivada")])
+
+        # Lista vertical em vez de abas lado a lado: no celular, quatro abas
+        # horizontais ficam apertadas e a contagem some. Empilhadas, cada grupo
+        # ocupa uma linha inteira e o número fica sempre visível.
+        GRUPOS = [
+            (f"🔴 Recebidas ({len(recebidas)})", recebidas,
+             "Nenhuma ocorrência aguardando atendimento.", "sucesso"),
+            (f"🟠 Em andamento ({len(em_andamento)})", em_andamento,
+             "Nenhuma ocorrência em andamento no momento.", "info"),
+            (f"🟢 Concluídas ({len(concluidas)})", concluidas,
+             "Nenhuma ocorrência concluída ainda.", "info"),
+            (f"🗂️ Arquivadas ({len(arquivadas)})", arquivadas,
+             "Nenhuma ocorrência arquivada ainda.", "info"),
+        ]
+
+        rotulos = [g[0] for g in GRUPOS]
+        escolhido = st.radio("Ver:", rotulos, key="filtro_grupo",
+                             label_visibility="collapsed")
+
+        st.markdown("---")
+
+        _, lista, vazio, tipo_vazio = next(g for g in GRUPOS if g[0] == escolhido)
+
+        if escolhido.startswith("🗂️"):
+            st.markdown(
+                "Ocorrências já atendidas saem das listas do dia a dia e ficam "
+                "guardadas aqui, mantendo o histórico do que a cidade resolveu. "
+                "**Nada é apagado:** o registro de cada uma continua público e "
+                "permanente na blockchain, e qualquer ocorrência pode ser "
+                "restaurada a qualquer momento."
             )
-            if st.button("Enviar resposta", key=f"envresp_{r['id']}"):
-                if resposta.strip():
-                    adicionar_mensagem(r, resposta, autor="municipio")
-                    salvar_registros(registros)
-                    st.rerun()
-                else:
-                    st.warning("Escreva a resposta antes de enviar.")
+            st.markdown("")
 
-            # ---- Arquivar / restaurar ----
-            # Arquivar em vez de excluir: nada é apagado, a ocorrência apenas
-            # sai da vista do dia a dia. Isso é coerente com o próprio projeto,
-            # em que o registro na blockchain é permanente por definição.
-            st.markdown("---")
-            if r.get("arquivada"):
-                if st.button("↩️ Restaurar", key=f"rest_{r['id']}"):
-                    r["arquivada"] = False
-                    salvar_registros(registros)
-                    st.rerun()
-            else:
-                if st.button("🗂️ Arquivar", key=f"arq_{r['id']}"):
-                    r["arquivada"] = True
-                    salvar_registros(registros)
-                    st.rerun()
+        if lista:
+            for r in lista:
+                mostrar_ocorrencia(r)
+        elif tipo_vazio == "sucesso":
+            st.success(vazio)
+        else:
+            st.info(vazio)
+    else:
+        st.warning(
+            "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")
 
-    ativas = [r for r in registros if not r.get("arquivada")]
+with aba_status:
+    st.markdown(
+        "<p class='subtitulo-dashboard'>💓 Status do Worker</p>",
+        unsafe_allow_html=True)
+    st.caption(
+        "Sinal de vida do processo que grava as ocorrências na blockchain. "
+        "Movida para dentro do Dashboard do Município em 25/09 (pedido do "
+        "Diogo) — assim ela fica atrás da mesma senha, em vez de aparecer "
+        "como uma página separada no menu lateral (sempre visível, de "
+        "propósito, durante o evento) onde um participante da gincana "
+        "poderia cair sem querer — ponto levantado pelo Rafa em 25/09."
+    )
 
-    recebidas = ordenar_por_data(
-        [r for r in ativas if r.get("status", "recebida") == "recebida"])
-    em_andamento = ordenar_por_data(
-        [r for r in ativas if r.get("status") == "em_andamento"])
-    concluidas = ordenar_por_data(
-        [r for r in ativas if r.get("status") == "concluida"])
-    arquivadas = ordenar_por_data(
-        [r for r in registros if r.get("arquivada")])
+    status = obter_status_worker()
+    if not status["ok"]:
+        st.error(f"⚠️ Não foi possível checar o worker: {status['erro']}")
+        st.caption(
+            "Isso pode ser o Supabase fora do ar (o que também afetaria o "
+            "resto do app), não necessariamente o worker parado."
+        )
+    else:
+        segundos = status["segundos_desde_ultima_volta"]
 
-    # Lista vertical em vez de abas lado a lado: no celular, quatro abas
-    # horizontais ficam apertadas e a contagem some. Empilhadas, cada grupo
-    # ocupa uma linha inteira e o número fica sempre visível.
-    GRUPOS = [
-        (f"🔴 Recebidas ({len(recebidas)})", recebidas,
-         "Nenhuma ocorrência aguardando atendimento.", "sucesso"),
-        (f"🟠 Em andamento ({len(em_andamento)})", em_andamento,
-         "Nenhuma ocorrência em andamento no momento.", "info"),
-        (f"🟢 Concluídas ({len(concluidas)})", concluidas,
-         "Nenhuma ocorrência concluída ainda.", "info"),
-        (f"🗂️ Arquivadas ({len(arquivadas)})", arquivadas,
-         "Nenhuma ocorrência arquivada ainda.", "info"),
-    ]
+        # As faixas abaixo espelham as constantes reais do
+        # worker_blockchain.py: INTERVALO_LOOP_SEG = 5 (a cada quantos
+        # segundos ele tenta de novo, em operação normal) e
+        # DURACAO_LEASE_SEG = 180 (a janela do lease, escolhida de
+        # propósito bem acima do timeout de confirmação de uma
+        # transação, 120s, pra uma espera real não parecer uma queda).
+        if segundos <= 30:
+            st.success(
+                f"🟢 **Worker ativo.** Última volta há {segundos:.0f} segundos.")
+        elif segundos <= 180:
+            st.warning(
+                f"🟡 **Sem novidade há {segundos / 60:.1f} minutos.** Ainda "
+                "dentro do esperado — pode ser só uma transação demorando a "
+                "confirmar na Amoy."
+            )
+        else:
+            st.error(
+                f"🔴 **Parado há {segundos / 60:.1f} minutos.** Isso já passa "
+                "da janela normal — vale checar o terminal do worker."
+            )
 
-    rotulos = [g[0] for g in GRUPOS]
-    escolhido = st.radio("Ver:", rotulos, key="filtro_grupo",
-                         label_visibility="collapsed")
+        st.caption(f"Dono do lease: `{status['owner']}`")
+        st.caption(
+            f"Última volta (horário do banco): "
+            f"{status['visto_em'].strftime('%d/%m/%Y às %H:%M:%S')}"
+        )
 
     st.markdown("---")
 
-    _, lista, vazio, tipo_vazio = next(g for g in GRUPOS if g[0] == escolhido)
+    # --- Saldo de POL — pedido do Rafa (25/09) -----------------------------
+    st.markdown(
+        "<p class='subtitulo-dashboard'>⛽ Saldo de gás (POL)</p>",
+        unsafe_allow_html=True)
 
-    if escolhido.startswith("🗂️"):
-        st.markdown(
-            "Ocorrências já atendidas saem das listas do dia a dia e ficam "
-            "guardadas aqui, mantendo o histórico do que a cidade resolveu. "
-            "**Nada é apagado:** o registro de cada uma continua público e "
-            "permanente na blockchain, e qualquer ocorrência pode ser "
-            "restaurada a qualquer momento."
-        )
-        st.markdown("")
-
-    if lista:
-        for r in lista:
-            mostrar_ocorrencia(r)
-    elif tipo_vazio == "sucesso":
-        st.success(vazio)
+    saldo = obter_saldo_pol()
+    if not saldo["ok"]:
+        st.warning(f"Não foi possível checar o saldo agora: {saldo['erro']}")
     else:
-        st.info(vazio)
-else:
-    st.warning(
-        "Nenhuma ocorrência registrada ainda. Envie pelo formulário primeiro!")
+        pol = saldo["saldo_pol"]
+        # Faixas escolhidas pelo Diogo (25/09): verde acima de 2 POL,
+        # amarelo entre 1 e 2, vermelho a partir de 1 POL. Bate com a
+        # própria estimativa de pior caso do evento já registrada desde o
+        # Bloco 0 (~2,16 POL pro dia inteiro) — ou seja, "verde" aqui
+        # significa "ainda dá pro evento inteiro no pior caso", e
+        # "vermelho" já é menos da metade disso.
+        if pol > 2.0:
+            st.success(f"🟢 **{pol:.4f} POL** na carteira do projeto.")
+        elif pol > 1.0:
+            st.warning(
+                f"🟡 **{pol:.4f} POL** na carteira — ainda dá, mas já vale "
+                "reforçar.")
+        else:
+            st.error(
+                f"🔴 **{pol:.4f} POL** na carteira — completar AGORA, antes "
+                "que uma transação comece a falhar por falta de gás.")
+
+    st.markdown("---")
+
+    # --- Fila pendente — pedido do Rafa (25/09) ----------------------------
+    st.markdown(
+        "<p class='subtitulo-dashboard'>📋 Ocorrências aguardando a "
+        "blockchain</p>",
+        unsafe_allow_html=True)
+
+    fila = obter_fila_pendente()
+    if not fila["ok"]:
+        st.warning(f"Não foi possível checar a fila agora: {fila['erro']}")
+    else:
+        total = fila["total_pendentes"]
+        travadas_qtd = fila["travadas"]
+        seg_antiga = fila["segundos_mais_antiga"]
+
+        if total == 0:
+            st.success("🟢 Nenhuma ocorrência esperando — a fila está zerada.")
+        elif travadas_qtd > 0 or (seg_antiga is not None and seg_antiga > 600):
+            st.error(
+                f"🔴 **{total} pendente(s)**, a mais antiga há "
+                f"{seg_antiga / 60:.1f} minutos."
+                + (f" **{travadas_qtd} já esgotaram as tentativas** e o "
+                   "worker desistiu delas — veja a lista abaixo."
+                   if travadas_qtd else "")
+            )
+        elif seg_antiga is not None and seg_antiga > 120:
+            st.warning(
+                f"🟡 **{total} pendente(s)**, a mais antiga há "
+                f"{seg_antiga / 60:.1f} minutos. Ainda dentro do esperado, "
+                "mas vale acompanhar."
+            )
+        else:
+            st.success(
+                f"🟢 **{total} pendente(s)**, dentro do tempo normal de "
+                "confirmação."
+            )
+
+    st.markdown("---")
+
+    # --- Travadas, com retry individual — pedido do Diogo (25/09) ---------
+    # Explicitamente NÃO um botão "tentar todas de novo": travar não é só
+    # lentidão do sistema, pode ser um problema real com aquela ocorrência
+    # específica. Por isso cada uma abre em separado, com o erro
+    # registrado à vista, e só quem olhar decide se vale reenviar.
+    st.markdown(
+        "<p class='subtitulo-dashboard'>🔴 Ocorrências travadas — precisam "
+        "de decisão manual</p>",
+        unsafe_allow_html=True)
+    st.caption(
+        "Já bateram as 3 tentativas do worker e ele desistiu sozinho — não "
+        "saem da fila automaticamente. Abra cada uma, veja o erro "
+        "registrado e decida se vale a pena tentar de novo."
+    )
+
+    travadas_info = listar_ocorrencias_travadas()
+    if not travadas_info["ok"]:
+        st.warning(
+            f"Não foi possível checar as travadas agora: "
+            f"{travadas_info['erro']}")
+    else:
+        lista_travadas = travadas_info["ocorrencias"]
+        if not lista_travadas:
+            st.success("🟢 Nenhuma ocorrência travada no momento.")
+        else:
+            for t in lista_travadas:
+                titulo_t = (
+                    f"{t['protocolo']}  ·  {t['tipo']}  ·  "
+                    f"travou no {t['travada_em']}  ·  {t['criado_em']}"
+                )
+                with st.expander(titulo_t):
+                    st.write(f"**Protocolo:** `{t['protocolo']}`")
+                    st.write(f"**Tipo:** {t['tipo']}")
+                    st.write(f"**Origem:** {t['origem']}")
+                    st.write(
+                        "**Status atual:** "
+                        f"{STATUS_LABELS.get(t['status'], t['status'])}")
+                    st.write(f"**Criada em:** {t['criado_em']}")
+                    st.write(f"**Travou tentando gravar:** {t['travada_em']}")
+                    st.write(f"**Tentativas esgotadas:** {t['tentativas']}")
+                    st.error(f"**Erro registrado:** {t['erro']}")
+                    st.caption(
+                        "Tentar de novo zera o contador — o worker pega "
+                        "esta ocorrência de novo, como se fosse a primeira "
+                        "tentativa, em até 5 segundos. Só faça isso se o "
+                        "motivo do erro acima já tiver sido resolvido (ou "
+                        "parecer algo passageiro): senão é só gastar mais "
+                        "3 tentativas à toa."
+                    )
+                    if st.button("🔁 Tentar novamente",
+                                 key=f"retry_{t['protocolo']}"):
+                        retentar_ocorrencia_travada(t['protocolo'])
+                        st.success(
+                            "Reaberta — o worker deve pegá-la na próxima "
+                            "volta.")
+                        st.rerun()
+
+    st.markdown("---")
+    st.caption(
+        "Além do botão de retentar acima, esta aba só lê dados — não "
+        "altera nenhuma outra ocorrência. Pra agir sobre uma queda do "
+        "processo ou sobre o saldo de POL, é preciso estar no notebook "
+        "onde o worker roda."
+    )
