@@ -17,8 +17,17 @@ avise o Diogo; não corrija este arquivo por conta própria sem registrar o moti
 
 ## 1. Antes de começar qualquer tarefa
 
-1. Leia o **"Fase 5 - Plano de execucao.md"** (documento do projeto no claude.ai, ver §5): o topo tem
-   as atualizações por data; a seção "Ordem do dia — o que falta" tem as pendências abertas.
+> **Comandos exatos:** se o Diogo escrever exatamente `INICIAR SESSAO` (maiúsculas, sem acento, nada
+> mais na mensagem), execute automaticamente o procedimento "1. Iniciar uma nova conversa" do
+> `PROMPTS.md`. Se escrever exatamente `ENCERRAR SESSAO` (mesma regra), execute automaticamente o
+> procedimento "2. Encerrar uma sessão" do `PROMPTS.md`. Só essas duas grafias exatas acionam os
+> procedimentos — usar as palavras "iniciar", "encerrar" ou "sessão" normalmente durante o trabalho, em
+> qualquer outra forma ou frase, não aciona nada.
+
+1. Leia o **"Fase 5 - Estado atual.md"** (documento do projeto no claude.ai, ver §5): é a memória
+   operacional curta — onde o projeto está agora, o que está concluído e as pendências abertas. Consulte
+   o **"Fase 5 - Plano de execucao.md"** (mesmo lugar) só quando precisar do detalhe histórico de uma
+   decisão ou bug específico; não é necessário lê-lo por inteiro nem reescrevê-lo a cada sessão.
 2. Leia **"Como trabalhar com o Diogo.md"** (mesmo lugar): como explicar, em que ritmo, o que evitar.
 3. Confira o estado real no **código e no Git** antes de afirmar qualquer coisa (último commit,
    `main` vs `origin/main`, arquivo no disco). Pasta certa no Mac: `/Users/diogo/Desktop/depin-urbano`
@@ -157,7 +166,8 @@ Motivos e datas estão no Plano de execução; aqui só a lista.
 
 | Assunto | Fonte de verdade | Observação |
 |---|---|---|
-| Estado atual, decisões, histórico e pendências da Fase 5 | Projeto: `Fase 5 - Plano de execucao.md` | Fonte vigente das decisões; em conflito, aplicar a regra de conflito do §2 |
+| Estado atual e pendências ativas da Fase 5 | Projeto: `Fase 5 - Estado atual.md` | Memória operacional curta; reescrita a cada sessão |
+| Histórico detalhado (decisões, bugs, testes) da Fase 5 | Projeto: `Fase 5 - Plano de execucao.md` | Consultar sob demanda; em conflito, aplicar a regra de conflito do §2 |
 | Como trabalhar com o Diogo | Projeto: `Como trabalhar com o Diogo.md` | |
 | Escopo e regras do evento (Talent Summit, 30/09) | Projeto: `Fase 5 - Talent Summit - decisoes e escopo ate 30-09.md` | Detalhes técnicos posteriores estão no Plano |
 | Custódia do CP e o que o certificado prova | Projeto: `Fase 5 - Custodia do token CP e o que prova o certificado.md` | Ver §6 (trecho da carteira no fluxo normal superado) |

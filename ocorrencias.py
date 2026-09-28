@@ -70,6 +70,10 @@ _REST_ANTENAS = f"{SUPABASE_URL}/rest/v1/antenas"
 # é /rest/v1/rpc/<nome-da-funcao> em vez de /rest/v1/<tabela>.
 _RPC_CRIAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/criar_participante"
 _RPC_RECUPERAR_PARTICIPANTE = f"{SUPABASE_URL}/rest/v1/rpc/recuperar_participante"
+# BLOCO 7 (ranking de contingência, 28/09): mesma função `telao()` que o
+# React do Rafa já usa e já testou desde 18/09 — nenhuma função nova no
+# banco, nenhuma mudança no que ele consome dela (REGRA QUE NÃO SE QUEBRA).
+_RPC_TELAO = f"{SUPABASE_URL}/rest/v1/rpc/telao"
 # BLOCO 9 (vitrine, 25/09 — corrigido mais tarde no mesmo dia): a área
 # pessoal do cidadão comum (obter_painel_cidadao, mais abaixo) tentou
 # primeiro reaproveitar a função `painel(p_id)` que o Rafa já usa no React
@@ -611,6 +615,45 @@ def obter_painel_cidadao(participante_id):
         "cp": sum(o["cp_ganho"] for o in ocorrencias),
         "pontos_gincana": 0,
         "ocorrencias": ocorrencias,
+    }
+
+
+def obter_ranking_contingencia():
+    """BLOCO 7 (28/09): "seguro-incêndio" do telão — página mínima e feia de
+    propósito no Streamlit, pra existir um jeito de mostrar o ranking da
+    gincana caso o React do Rafa caia no dia do evento.
+
+    Chama a MESMA RPC `telao()` que o React já usa e já testou desde 18/09 —
+    não cria nenhuma função nova no banco, e não toca em `telao()` (REGRA
+    QUE NÃO SE QUEBRA: o que o Rafa consome dela não muda em nada). Como é
+    só leitura de uma função que já existe e já está testada, não há
+    tratamento extra de regra de negócio aqui — só repassar o que o banco
+    devolve.
+
+    Devolve:
+        {"ok": True,
+         "ranking": [{"apelido":..., "pontos":..., "cp":..., "posicao":...},
+                      ...],   # já vem ordenado; ver contrato revisão 8
+         "evento": {"total_ocorrencias":..., "participantes":...,
+                     "meta":..., "antenas_ativas":...}}
+    ou {"ok": False, "erro": "..."} se a consulta falhar.
+    """
+    try:
+        resp = requests.post(
+            _RPC_TELAO,
+            headers=_HEADERS,
+            json={},
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        dados = resp.json()
+    except Exception as e:
+        return {"ok": False, "erro": f"não foi possível consultar: {e}"}
+
+    return {
+        "ok": True,
+        "ranking": dados.get("ranking") or [],
+        "evento": dados.get("evento") or {},
     }
 
 
