@@ -600,6 +600,23 @@ if enviar:
 
             try:
                 registro_criado = criar_registro(dados)
+            except requests.exceptions.HTTPError as e:
+                # Bloco 8 (teste de destruição, 28/09): tentar registrar duas
+                # vezes na mesma antena esbarra no índice único do banco
+                # (uniq_participante_antena) e o Supabase responde 409. Sem
+                # este "if", a pessoa via o erro cru do servidor — agora ela
+                # entende o que aconteceu e o que fazer a seguir.
+                if (antena_numero is not None and e.response is not None
+                        and e.response.status_code == 409):
+                    st.error(
+                        "🔁 Você já registrou uma ocorrência nesta antena. "
+                        "Escaneie o QR Code de **outra antena** para "
+                        "continuar participando da gincana.")
+                else:
+                    st.error(
+                        f"❌ Não foi possível salvar sua ocorrência agora: {e}. "
+                        "Tente novamente em instantes.")
+                st.stop()
             except Exception as e:
                 st.error(
                     f"❌ Não foi possível salvar sua ocorrência agora: {e}. "
