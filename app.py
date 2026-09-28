@@ -375,7 +375,11 @@ foto = None
 
 if st.session_state["camera_ligada"]:
     foto = st.camera_input("Enquadre a ocorrência e toque em Take Photo")
-    if st.button("✖️ Desligar a câmera"):
+    # Ícone trocado (27/09): o "✖️" e o "📍" são emoji coloridos (vermelho/
+    # branco) e ficavam quase invisíveis em cima do botão vermelho-laranja do
+    # tema novo. "✕" e "⌖" são símbolos de texto puro — herdam a cor branca
+    # do texto do botão, então continuam legíveis em qualquer cor de fundo.
+    if st.button("✕ Desligar a câmera"):
         st.session_state["camera_ligada"] = False
         st.rerun()
 else:
@@ -411,7 +415,7 @@ if "aguardando_localizacao" not in st.session_state:
 if "endereco_preenchido_auto" not in st.session_state:
     st.session_state["endereco_preenchido_auto"] = False
 
-if st.button("📍 Usar minha localização"):
+if st.button("⌖ Usar minha localização"):
     st.session_state["aguardando_localizacao"] = True
     st.rerun()
 
@@ -710,10 +714,10 @@ if comprovante:
         # e medidas de .stButton > button em tema_visual.py).
         st.markdown(
             f'<a href="https://depinurbano.vercel.app/eu?p={participante_id}" '
-            'target="_self" style="display:inline-block;background:#5B8FB9;'
-            'color:#FFFFFF;border:none;border-radius:10px;padding:0.9rem 2rem;'
-            'font-weight:650;font-size:1.55rem;text-decoration:none;'
-            'box-shadow:0 1px 3px rgba(59,89,116,0.18);">'
+            'target="_self" style="display:inline-block;background:#E03A12;'
+            'color:#FFFFFF;border:none;border-radius:999px;padding:0.9rem 2rem;'
+            'font-weight:700;font-size:1.55rem;text-decoration:none;'
+            'box-shadow:0 2px 6px rgba(66,48,46,0.18);">'
             'Voltar para o meu painel da gincana</a>',
             unsafe_allow_html=True,
         )

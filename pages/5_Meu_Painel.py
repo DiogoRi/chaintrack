@@ -140,10 +140,26 @@ if not painel["ok"]:
 ocorrencias = painel["ocorrencias"]
 cp_real = painel["cp"]
 
+# Conversão CP → real: ilustrativa (não fechada com a prefeitura nem com
+# nenhum parceiro de pagamento), só para dar uma noção de valor no estande.
+# Fácil de ajustar depois, é só mudar o número aqui — usada tanto no "CP
+# acumulado" abaixo quanto nos cartões de resgate mais adiante.
+CP_PARA_REAL = 0.50
+
+
+def formatar_real(valor: float) -> str:
+    return f"R$ {valor:.2f}".replace(".", ",")
+
+
 st.markdown("---")
 
 colunas = st.columns(3) if painel["pontos_gincana"] else st.columns(2)
-colunas[0].metric("💎 CP acumulado", cp_real)
+colunas[0].metric(
+    "💎 CP acumulado",
+    f"{cp_real} CP",
+    f"≈ {formatar_real(cp_real * CP_PARA_REAL)}",
+    delta_color="off",
+)
 colunas[1].metric("📋 Ocorrências registradas", len(ocorrencias))
 if painel["pontos_gincana"]:
     colunas[2].metric("🏆 Pontos de gincana", painel["pontos_gincana"])
@@ -188,26 +204,16 @@ st.markdown("---")
 
 # ===========================================================================
 # Vitrine de resgate — SIMULAÇÃO, nada aqui debita nada de verdade.
-#
-# Valores abaixo são ilustrativos (não fechados com a prefeitura nem com
-# nenhum parceiro de pagamento) — servem só para o estande mostrar "para
-# que serve o CP". Fáceis de ajustar depois, é só mudar os números aqui.
-st.markdown("### O que dá pra fazer com o CP")
+st.markdown("### Para que o CP poderá servir")
 st.caption(
-    "🎭 **Simulação** — nada abaixo é uma transação real. Zona Azul e IPTU "
-    "dependem de integração com a prefeitura; Pix é dinheiro de verdade e "
-    "sair de protótipo para isso entra em regulação de meio de pagamento. "
-    "Esta vitrine existe para mostrar o que o CP pode virar quando o "
-    "projeto crescer."
+    "🎭 Exemplos de como o CP poderá ser usado no futuro — nada abaixo é "
+    "uma transação real."
 )
 
 RESGATES = [
-    {"chave": "zona_azul", "emoji": "🅿️", "nome": "1 diária de Zona Azul",
-     "custo": 5},
-    {"chave": "iptu", "emoji": "🏠", "nome": "R$ 5 de abatimento no IPTU",
-     "custo": 10},
-    {"chave": "pix", "emoji": "💸", "nome": "R$ 5 via Pix",
-     "custo": 5},
+    {"chave": "zona_azul", "emoji": "🅿️", "nome": "Zona Azul", "custo": 5},
+    {"chave": "iptu", "emoji": "🏠", "nome": "IPTU", "custo": 10},
+    {"chave": "pix", "emoji": "💸", "nome": "Pix", "custo": 5},
 ]
 
 # Saldo simulado: começa igual ao CP real e só existe durante esta visita
@@ -229,8 +235,19 @@ if saldo_sim != cp_real:
 colunas_resgate = st.columns(len(RESGATES))
 for coluna, resgate in zip(colunas_resgate, RESGATES):
     with coluna:
-        st.markdown(f"#### {resgate['emoji']} {resgate['nome']}")
-        st.caption(f"Custo: {resgate['custo']} CP")
+        # Altura fixa no título: garante que os três cartões fiquem
+        # alinhados mesmo se um nome for maior que os outros (antes, "R$ 5
+        # de abatimento no IPTU" quebrava em duas linhas e empurrava esse
+        # cartão para baixo dos outros dois).
+        st.markdown(
+            "<div style='min-height:2.6em; display:flex; "
+            "align-items:center;'>"
+            f"<span style='font-size:1.15rem; font-weight:700;'>"
+            f"{resgate['emoji']} {resgate['nome']}</span></div>",
+            unsafe_allow_html=True,
+        )
+        valor_real = formatar_real(resgate["custo"] * CP_PARA_REAL)
+        st.caption(f"Custo: {resgate['custo']} CP · {valor_real}")
         clicado = st.button(
             "Resgatar (simulação)",
             key=f"resgatar_{resgate['chave']}",
@@ -239,9 +256,9 @@ for coluna, resgate in zip(colunas_resgate, RESGATES):
         if clicado:
             st.session_state[chave_saldo_sim] = saldo_sim - resgate["custo"]
             st.success(
-                f"🎭 Simulação: {resgate['nome']} resgatado! Em um produto "
-                "real, isso creditaria o benefício na sua conta. Aqui, é só "
-                "para mostrar como funcionaria."
+                f"🎭 Simulação: resgate de \"{resgate['nome']}\" concluído! "
+                "Em um produto real, isso creditaria o benefício na sua "
+                "conta. Aqui, é só para mostrar como funcionaria."
             )
             st.rerun()
         if saldo_sim < resgate["custo"]:

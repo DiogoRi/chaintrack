@@ -4,18 +4,22 @@
 # do Streamlit — menus, calendários, o seletor de arquivos — nasçam já com as
 # cores certas. Só CSS não alcança essas partes.
 #
-# Paleta em tons pastéis, clima "serviço público moderno":
-#   fundo   #F5F7FA  cinza-azulado bem claro
-#   cartões #FFFFFF  branco
-#   destaque#5B8FB9  azul suave
-#   texto   #33404D  cinza-azulado escuro (bom contraste, sem ser preto)
+# Bloco 6 (27/09): paleta da página da gincana do Rafa (depinurbano.vercel.app),
+# para as duas páginas parecerem um produto só. Detalhes e o resto da paleta
+# em tema_visual.py.
+#   fundo    #FFF9EF  creme
+#   campos   #F4F0E7  creme um pouco mais escuro
+#   destaque #E03A12  vermelho-laranja (botões, seleção)
+#   texto    #42302E  marrom escuro
+#
+# O tema anterior (azul pastel da Fase 3) está no histórico do Git.
 
 [theme]
 base = "light"
-primaryColor = "#5B8FB9"
-backgroundColor = "#F5F7FA"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#33404D"
+primaryColor = "#E03A12"
+backgroundColor = "#FFF9EF"
+secondaryBackgroundColor = "#F4F0E7"
+textColor = "#42302E"
 font = "sans serif"
 
 [client]

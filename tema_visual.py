@@ -1,19 +1,40 @@
 """
 tema_visual.py — DePIN Urbano
 
-Estilo visual compartilhado entre as duas páginas do app.
+Estilo visual compartilhado entre todas as páginas do app.
 
 A paleta base (fundo, texto, cor de destaque) fica em `.streamlit/config.toml`,
 porque só de lá o Streamlit pinta os próprios componentes internos — menus
 suspensos, o seletor de arquivos, os avisos. O CSS abaixo cuida do resto:
 tamanhos de título, o menu lateral, os cartões das ocorrências e espaçamentos.
 
-Paleta em tons pastéis:
-    fundo      #F5F7FA   cinza-azulado bem claro
-    cartões    #FFFFFF   branco
-    destaque   #5B8FB9   azul suave
-    texto      #33404D   cinza-azulado escuro
-    apoio      #7A8794   cinza médio (legendas)
+TEMA (Bloco 6, 27/09): alinhado com a página da gincana do Rafa
+(depinurbano.vercel.app), para o ChainTrack e o React parecerem um produto só.
+Cores tiradas dos pixels de uma captura da página do Rafa (27/09):
+    fundo        #FFF9EF   creme
+    texto        #42302E   marrom escuro (títulos e texto)
+    destaque     #E03A12   vermelho-laranja (botões) — escolhido em vez do
+                           laranja do losango (#F26120) porque texto branco
+                           sobre ele tem contraste 4,4:1; sobre o laranja
+                           seria 3,2:1, fraco para ler no sol do evento
+    detalhe      #F26120   laranja do losango (bordas em foco, realces)
+    campos       #F4F0E7   fundo dos campos / #D0CBC5 borda
+    apoio        #6B5652   marrom médio (legendas)
+    decorativas  #2942C0 azul · #FBC467 amarelo · #F9A8A4 rosa · #6BB6A2 verde
+                 — só na faixa colorida do topo, como os blocos da página do Rafa
+
+Estilo copiado da página do Rafa: rótulos em MAIÚSCULAS com letras espaçadas,
+campos e botões em formato de pílula (bem arredondados), fundo creme liso.
+
+Fontes (Google Fonts, parecidas com as do Rafa — o nome exato das dele não foi
+confirmado): DM Sans no texto e Space Mono nos rótulos. A fonte é aplicada só
+a texto, título, rótulo, campo e botão — nunca com seletor genérico (*, span),
+porque os ícones do Streamlit também são uma fonte e virariam texto solto
+("keyboard_arrow_down") se ela fosse trocada.
+
+Como voltar ao tema anterior (azul pastel da Fase 3): ele está no histórico
+do Git, no commit anterior ao do Bloco 6 — basta restaurar este arquivo, o
+`.streamlit/config.toml` e as cores do botão "Voltar" no `app.py`.
 
 Uso:
     from tema_visual import aplicar_tema
@@ -24,28 +45,55 @@ import streamlit as st
 
 _CSS = """
 <style>
-    /* ---------- Fundo ---------- */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@700&display=swap');
+
+    /* ---------- Fontes ----------
+       Só em elementos de texto. Ver o aviso sobre ícones no topo do arquivo. */
+    .stApp, .stApp p, .stApp li, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+    .stApp label, .stApp input, .stApp textarea, .stApp button,
+    .stApp a, .stMarkdown, .titulo-dashboard, .subtitulo-dashboard,
+    .titulo-sobre, .subtitulo-sobre, .frase-impacto {
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    /* ---------- Fundo ----------
+       Creme liso, como a página do Rafa (sem degradê). */
     .stApp {
-        background: linear-gradient(180deg, #F7F9FC 0%, #EEF2F7 100%);
+        background: #FFF9EF;
+    }
+
+    /* ---------- Faixa colorida no topo ----------
+       As cores dos blocos geométricos da página do Rafa, numa faixa fina.
+       É o que mais "amarra" visualmente as duas páginas, sem competir com o
+       conteúdo. */
+    .block-container::before {
+        content: "";
+        display: block;
+        height: 6px;
+        border-radius: 999px;
+        margin-bottom: 1.4rem;
+        background: linear-gradient(90deg,
+            #2942C0 0 20%, #E03A12 20% 40%, #FBC467 40% 60%,
+            #F9A8A4 60% 80%, #6BB6A2 80% 100%);
     }
 
     /* ---------- Títulos ----------
        Bem maiores que o padrão: numa apresentação projetada, o título é o
        que orienta quem assiste de longe. */
     h1 {
-        color: #3D6E94 !important;
+        color: #42302E !important;
         font-weight: 700 !important;
         font-size: 2.6rem !important;
         letter-spacing: -0.5px;
         margin-bottom: 0.2rem !important;
     }
     h2 {
-        color: #3D6E94 !important;
-        font-weight: 650 !important;
+        color: #42302E !important;
+        font-weight: 700 !important;
         font-size: 1.9rem !important;
     }
     h3 {
-        color: #4A7FA5 !important;
+        color: #42302E !important;
         font-weight: 600 !important;
         font-size: 1.35rem !important;
         margin-top: 1.6rem !important;
@@ -58,7 +106,7 @@ _CSS = """
     .titulo-dashboard {
         font-size: 3.2rem !important;
         font-weight: 700 !important;
-        color: #3D6E94 !important;
+        color: #42302E !important;
         letter-spacing: -1px;
         margin: 0 0 0.6rem 0 !important;
         line-height: 1.1;
@@ -66,7 +114,7 @@ _CSS = """
     .subtitulo-dashboard {
         font-size: 2.2rem !important;
         font-weight: 600 !important;
-        color: #3D6E94 !important;
+        color: #42302E !important;
         margin: 0.4rem 0 0.6rem 0 !important;
     }
 
@@ -77,7 +125,7 @@ _CSS = """
     .titulo-sobre {
         font-size: 2.6rem !important;
         font-weight: 700 !important;
-        color: #3D6E94 !important;
+        color: #42302E !important;
         letter-spacing: -0.5px;
         line-height: 1.15;
         margin: 0 0 0.9rem 0 !important;
@@ -85,7 +133,7 @@ _CSS = """
     .subtitulo-sobre {
         font-size: 1.4rem !important;
         font-weight: 500 !important;
-        color: #6B8FA8 !important;
+        color: #8A6F69 !important;
         margin: 0 0 1.6rem 0 !important;
     }
 
@@ -97,72 +145,85 @@ _CSS = """
         font-size: 1.45rem !important;
         line-height: 1.35;
         font-weight: 500;
-        color: #6B8FA8 !important;
+        color: #8A6F69 !important;
         margin: -0.4rem 0 1.4rem 0 !important;
     }
 
     /* ---------- Menu lateral (navegação entre as páginas) ----------
        O padrão é discreto demais para usar ao vivo diante de uma banca. */
     section[data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E1E8F0;
+        background-color: #FBF1E3;
+        border-right: 1px solid #EADFD2;
     }
     section[data-testid="stSidebar"] a,
     section[data-testid="stSidebar"] a span,
     section[data-testid="stSidebar"] li a p {
         font-size: 1.12rem !important;
         font-weight: 600 !important;
-        color: #3D6E94 !important;
+        color: #42302E !important;
     }
     section[data-testid="stSidebar"] a:hover {
-        background-color: #EEF4FA !important;
-        border-radius: 8px;
+        background-color: #F9DCD5 !important;
+        border-radius: 999px;
     }
 
-    /* ---------- Botões ---------- */
+    /* ---------- Botões ----------
+       Pílula, como o botão "Entrar na caça" da página do Rafa. */
     .stButton > button {
-        background: #5B8FB9;
+        background: #E03A12;
         color: #FFFFFF;
         border: none;
-        border-radius: 10px;
+        border-radius: 999px;
         padding: 0.9rem 2rem;
-        font-weight: 650;
+        font-weight: 700;
         font-size: 1.55rem;
         text-transform: none;
         letter-spacing: 0;
-        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
+        box-shadow: 0 2px 6px rgba(66, 48, 46, 0.18);
         transition: background 0.15s ease, transform 0.15s ease;
     }
     .stButton > button:hover {
-        background: #4A7FA5;
+        background: #C2300E;
+        color: #FFFFFF;
         transform: translateY(-1px);
+    }
+    .stButton > button:focus:not(:active) {
+        color: #FFFFFF;
+    }
+    /* O Streamlit põe o texto do botão dentro de um <p> com tamanho fixo
+       (14px na versão 1.64, numa <div> e num <p> por dentro), o que anulava o tamanho definido acima — por
+       isso os botões grandes pensados para o evento saíam pequenos, inclusive
+       no tema anterior. Aqui o texto passa a seguir o tamanho do botão. */
+    .stButton > button div, .stButton > button p,
+    .stDownloadButton > button div, .stDownloadButton > button p {
+        font-size: inherit !important;
+        font-weight: inherit !important;
     }
 
     /* ---------- Campos ---------- */
     .stTextInput > div > div > input,
     .stTextArea textarea {
-        background-color: #FFFFFF !important;
-        color: #33404D !important;
-        border: 1px solid #D6DFEA !important;
-        border-radius: 8px !important;
+        background-color: #F4F0E7 !important;
+        color: #42302E !important;
+        border: none !important;
+        border-radius: 999px !important;
     }
-    .stTextInput > div > div > input:focus,
-    .stTextArea textarea:focus {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.15) !important;
+    .stTextArea textarea {
+        border-radius: 18px !important;
     }
     /* Texto de exemplo dentro dos campos */
     .stTextInput input::placeholder,
     .stTextArea textarea::placeholder {
-        color: #A9B4C0 !important;
+        color: #857670 !important;
         font-style: italic;
     }
 
     /* ---------- Campos que a pessoa preenche ----------
        Listas suspensas, campo numérico e área de arquivo recebem o mesmo
-       tratamento: caixa branca, borda visível, cantos arredondados e uma
-       sombra leve. Sem isso eles somem no fundo claro e a pessoa não
-       percebe que ali tem algo para tocar.
+       tratamento: fundo creme mais escuro, borda visível, formato de pílula
+       e uma sombra interna leve (o campo parece "afundado", como o campo de
+       apelido da página do Rafa). Sem contorno eles somem no fundo claro e
+       a pessoa não percebe que ali tem algo para tocar.
 
        Os nomes usados abaixo (stSelectbox, stNumberInputContainer e
        companhia) são os que o próprio Streamlit coloca no HTML nesta
@@ -173,23 +234,24 @@ _CSS = """
     /* Lista suspensa: a caixa é o elemento com role="group", que envolve
        o texto e a setinha. */
     div[data-testid="stSelectbox"] div[role="group"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #C3D0E0 !important;
-        border-radius: 10px !important;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        background-color: #F4F0E7 !important;
+        border: 1.5px solid #D0CBC5 !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 2px 4px rgba(66, 48, 46, 0.08) !important;
         min-height: 46px;
+        padding-left: 0.4rem;
         cursor: pointer !important;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     div[data-testid="stSelectbox"] div[role="group"]:hover,
     div[data-testid="stSelectbox"] div[role="group"]:focus-within {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
+        border-color: #F26120 !important;
+        box-shadow: 0 0 0 3px rgba(242, 97, 32, 0.15) !important;
     }
     div[data-testid="stSelectbox"] input {
         background: transparent !important;
         border: none !important;
-        color: #33404D !important;
+        color: #42302E !important;
         cursor: pointer !important;
     }
     div[data-testid="stSelectbox"] button {
@@ -198,7 +260,7 @@ _CSS = """
         cursor: pointer !important;
     }
     div[data-testid="stSelectbox"] svg {
-        color: #5B8FB9 !important;
+        color: #E03A12 !important;
     }
 
     /* A MESMA caixa, para a estrutura antiga do componente.
@@ -211,17 +273,17 @@ _CSS = """
        caixa: a que não existir simplesmente não encontra nada. */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
     div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        border: 1px solid #C3D0E0 !important;
-        border-radius: 10px !important;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        background-color: #F4F0E7 !important;
+        border: 1.5px solid #D0CBC5 !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 2px 4px rgba(66, 48, 46, 0.08) !important;
         min-height: 46px;
         cursor: pointer !important;
     }
     div[data-testid="stSelectbox"] div[data-baseweb="select"] > div:hover,
     div[data-baseweb="select"] > div:hover {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
+        border-color: #F26120 !important;
+        box-shadow: 0 0 0 3px rgba(242, 97, 32, 0.15) !important;
     }
     div[data-baseweb="select"] > div > div {
         border: none !important;
@@ -231,82 +293,90 @@ _CSS = """
     /* Campo numérico: a borda envolve o número junto com os botões de mais
        e menos. Soltos, eles não parecem ter relação com o valor ao lado. */
     div[data-testid="stNumberInputContainer"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #C3D0E0 !important;
-        border-radius: 10px !important;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.10) !important;
+        background-color: #F4F0E7 !important;
+        border: 1.5px solid #D0CBC5 !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 2px 4px rgba(66, 48, 46, 0.08) !important;
         overflow: hidden;
         min-height: 46px;
+        padding-left: 0.4rem;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
     div[data-testid="stNumberInputContainer"]:hover,
     div[data-testid="stNumberInputContainer"]:focus-within {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 2px 6px rgba(59, 89, 116, 0.18) !important;
+        border-color: #F26120 !important;
+        box-shadow: 0 0 0 3px rgba(242, 97, 32, 0.15) !important;
     }
     div[data-testid="stNumberInputField"] {
         background: transparent !important;
         border: none !important;
-        color: #33404D !important;
+        color: #42302E !important;
     }
     div[data-testid="stNumberInputStepUp"],
     div[data-testid="stNumberInputStepDown"],
     button[data-testid="stNumberInputStepUp"],
     button[data-testid="stNumberInputStepDown"] {
-        background-color: #EEF4FA !important;
-        border-left: 1px solid #C3D0E0 !important;
+        background-color: #FBE3D3 !important;
+        border-left: 1px solid #D0CBC5 !important;
         cursor: pointer !important;
     }
     button[data-testid="stNumberInputStepUp"]:hover,
     button[data-testid="stNumberInputStepDown"]:hover {
-        background-color: #DCE8F4 !important;
+        background-color: #F9C9B0 !important;
     }
 
     /* Campos de texto: mesma borda das listas, para a coluna inteira ficar
        com um desenho só. */
     div[data-testid="stTextInputRootElement"],
     div[data-testid="stTextAreaRootElement"] {
-        background-color: #FFFFFF !important;
-        border: 1px solid #C3D0E0 !important;
-        border-radius: 10px !important;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.08) !important;
+        background-color: #F4F0E7 !important;
+        border: 1.5px solid #D0CBC5 !important;
+        border-radius: 999px !important;
+        box-shadow: inset 0 2px 4px rgba(66, 48, 46, 0.08) !important;
+        padding-left: 0.4rem;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    /* Área de texto de várias linhas: pílula completa ficaria estranha num
+       campo alto, então os cantos são só bem arredondados. */
+    div[data-testid="stTextAreaRootElement"] {
+        border-radius: 18px !important;
     }
     div[data-testid="stTextInputRootElement"]:focus-within,
     div[data-testid="stTextAreaRootElement"]:focus-within {
-        border-color: #5B8FB9 !important;
-        box-shadow: 0 0 0 2px rgba(91, 143, 185, 0.15) !important;
+        border-color: #F26120 !important;
+        box-shadow: 0 0 0 3px rgba(242, 97, 32, 0.15) !important;
     }
 
     /* Área de envio de arquivo. */
     section[data-testid="stFileUploaderDropzone"] {
-        background-color: #FFFFFF !important;
-        border: 1px dashed #C3D0E0 !important;
-        border-radius: 10px !important;
-        box-shadow: 0 1px 2px rgba(59, 89, 116, 0.08) !important;
+        background-color: #F4F0E7 !important;
+        border: 1.5px dashed #D0CBC5 !important;
+        border-radius: 18px !important;
+        box-shadow: none !important;
     }
     section[data-testid="stFileUploaderDropzone"]:hover {
-        border-color: #5B8FB9 !important;
+        border-color: #F26120 !important;
     }
 
-    /* Sombra leve em todo botão, inclusive o de baixar o comprovante. */
+    /* Botão de baixar o comprovante: mesma pílula dos outros botões. */
     .stDownloadButton > button {
-        background: #5B8FB9;
+        background: #E03A12;
         color: #FFFFFF;
         border: none;
-        border-radius: 10px;
-        font-weight: 650;
-        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.18);
+        border-radius: 999px;
+        font-weight: 700;
+        box-shadow: 0 2px 6px rgba(66, 48, 46, 0.18);
         transition: background 0.15s ease, box-shadow 0.15s ease,
                     transform 0.15s ease;
     }
     .stDownloadButton > button:hover {
-        background: #4A7FA5;
-        box-shadow: 0 3px 8px rgba(59, 89, 116, 0.24);
+        background: #C2300E;
+        color: #FFFFFF;
+        box-shadow: 0 3px 8px rgba(66, 48, 46, 0.24);
         transform: translateY(-1px);
     }
     .stButton > button:hover {
-        box-shadow: 0 3px 8px rgba(59, 89, 116, 0.24);
+        box-shadow: 0 3px 8px rgba(66, 48, 46, 0.24);
     }
 
     /* ---------- Lista de grupos do dashboard ----------
@@ -316,28 +386,34 @@ _CSS = """
     div[role="radiogroup"] label p {
         font-size: 1.12rem !important;
         font-weight: 600 !important;
-        color: #33404D !important;
+        color: #42302E !important;
     }
     div[role="radiogroup"] > label {
         padding: 0.35rem 0;
     }
 
+    /* ---------- Abas (Dashboard: Ocorrências / Status do Worker) ---------- */
+    button[data-baseweb="tab"] p {
+        font-weight: 700 !important;
+        color: #42302E !important;
+    }
+
     /* ---------- Cartões (expanders) ---------- */
     div[data-testid="stExpander"] {
-        background-color: #FFFFFF;
-        border: 1px solid #E1E8F0;
-        border-radius: 12px;
+        background-color: #FFFDF8;
+        border: 1px solid #EADFD2;
+        border-radius: 18px;
         margin-bottom: 0.6rem;
-        box-shadow: 0 1px 3px rgba(59, 89, 116, 0.06);
+        box-shadow: 0 1px 3px rgba(66, 48, 46, 0.06);
     }
     div[data-testid="stExpander"] summary {
         font-weight: 600;
-        color: #33404D;
+        color: #42302E;
     }
 
     /* ---------- Avisos ---------- */
     div[data-testid="stAlert"] {
-        border-radius: 10px;
+        border-radius: 16px;
         border: none;
     }
 
@@ -346,7 +422,7 @@ _CSS = """
        quase invisível numa projeção, e essas legendas carregam informação
        que a banca precisa conseguir ler. */
     .stCaption, div[data-testid="stCaptionContainer"] p {
-        color: #46525F !important;
+        color: #6B5652 !important;
         font-size: 0.96rem !important;
     }
 
@@ -395,7 +471,22 @@ _CSS = """
     /* ---------- Rótulos dos campos ---------- */
     label p {
         font-weight: 600 !important;
-        color: #4A5765 !important;
+        color: #4A4742 !important;
+    }
+    /* Rótulo em cima de cada campo ("Tipo de ocorrência", "Número"...):
+       MAIÚSCULAS, letras espaçadas e fonte mono, como o "SEU APELIDO" da
+       página do Rafa. O seletor mira só o rótulo do campo
+       (stWidgetLabel), não as opções de listas e botões de rádio — essas
+       continuam em texto normal, que é mais fácil de ler. Sem "div" na
+       frente de propósito: na versão 1.64 do Streamlit o stWidgetLabel é o
+       próprio <label>; em versões antigas era uma <div>. */
+    [data-testid="stWidgetLabel"] p {
+        font-family: 'Space Mono', monospace !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.82rem !important;
+        color: #4A4742 !important;
     }
 </style>
 """

@@ -70,6 +70,15 @@ avise o Diogo; não corrija este arquivo por conta própria sem registrar o moti
 - Constantes espelhadas precisam mudar juntas: `RETRIES_MAX` (`worker_blockchain.py`) ==
   `_RETRIES_MAX_WORKER` (`ocorrencias.py`); faixas de status do worker espelham `INTERVALO_LOOP_SEG` e
   `DURACAO_LEASE_SEG`.
+- **Se uma ferramenta de edição/escrita falhar ou ficar sem progresso por tempo anormal, não insista
+  nem entre em loop de arquivos intermediários.** Pare, releia o estado real do arquivo (a "falha" pode
+  ser só a ferramenta recusando uma edição vazia/mal direcionada, sem ter mudado nada) e diagnostique a
+  causa antes de tentar de novo. Para documentos do projeto Claude.ai — que não têm edição incremental,
+  só leem e regravam tudo —, usar uma cópia temporária para preservar o original e validar que nada foi
+  perdido antes de regravar **é permitido e correto**; isso não é o problema. O que não pode acontecer é
+  repetir a mesma operação, empilhar cópias em cascata (`original.md`, `plano.md`, `_correto.md`...) ou
+  trocar de estratégia sozinho sem diagnosticar — **pare e pergunte ao Diogo antes** (decidido 27/09,
+  depois de três tentativas de escrever um arquivo grande travarem em sequência).
 
 ### Documentação
 - Não recrie documentos inteiros quando uma atualização incremental basta.
@@ -186,5 +195,5 @@ Motivos e datas estão no Plano de execução; aqui só a lista.
   para `/Users/diogo/Desktop/depin-urbano` (25/09); `registros.json` virou Supabase; carteira do
   cidadão, pausa do auto-refresh do dashboard e rotação de chaves não valem mais.
 
-Cada documento do projeto listado acima tem, no topo, uma nota "⚠️ Nota de 26–27/09" com os trechos
+Cada documento do projeto listado acima tem, no topo, uma nota "⚠️ Nota de 27/09/2026: trechos superados" com os trechos
 superados.
