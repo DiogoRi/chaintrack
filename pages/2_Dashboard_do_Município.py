@@ -44,7 +44,7 @@ from ocorrencias import (                      # noqa: E402
     ordenar_por_data,
     protocolo_de,
     retentar_ocorrencia_travada,
-    salvar_registros,
+    salvar_ocorrencia_dashboard,
     texto_prazo,
 )
 from tema_visual import aplicar_tema           # noqa: E402
@@ -309,7 +309,7 @@ with aba_ocorrencias:
                         r["prazo_dias"] = int(prazo_escolhido)
                         if mudou_status:
                             aplicar_status(r, novo_status)
-                        salvar_registros(registros)
+                        salvar_ocorrencia_dashboard(r)
                         st.rerun()
 
                 # ---- Mensagens ----
@@ -337,7 +337,7 @@ with aba_ocorrencias:
                 if st.button("Enviar resposta", key=f"envresp_{r['id']}"):
                     if resposta.strip():
                         adicionar_mensagem(r, resposta, autor="municipio")
-                        salvar_registros(registros)
+                        salvar_ocorrencia_dashboard(r)
                         st.rerun()
                     else:
                         st.warning("Escreva a resposta antes de enviar.")
@@ -350,12 +350,12 @@ with aba_ocorrencias:
                 if r.get("arquivada"):
                     if st.button("↩️ Restaurar", key=f"rest_{r['id']}"):
                         r["arquivada"] = False
-                        salvar_registros(registros)
+                        salvar_ocorrencia_dashboard(r)
                         st.rerun()
                 else:
                     if st.button("🗂️ Arquivar", key=f"arq_{r['id']}"):
                         r["arquivada"] = True
-                        salvar_registros(registros)
+                        salvar_ocorrencia_dashboard(r)
                         st.rerun()
 
         ativas = [r for r in registros if not r.get("arquivada")]

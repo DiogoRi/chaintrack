@@ -716,6 +716,11 @@ def salvar_registros(registros, caminho=None):
     exatamente como chamavam quando isto escrevia num arquivo. Por baixo,
     virou um upsert: o Supabase encontra cada linha pelo protocolo (que é
     único) e atualiza os campos daquela linha, sem duplicar nada.
+
+    ⚠️ 27/09: NÃO usar mais nas telas. Regrava todas as linhas e apaga
+    `participante_id`/`antena_numero` (que `_do_banco()` não traz). O Dashboard
+    passou a usar `salvar_ocorrencia_dashboard(r)`. Mantida só para não quebrar
+    algum script avulso que ainda a chame.
     """
     if not registros:
         return
@@ -775,6 +780,43 @@ def atualizar_registro(protocolo, **campos):
         _REST,
         headers=_HEADERS,
         params={"protocolo": f"eq.{protocolo}"},
+        json=corpo,
+        timeout=_TIMEOUT,
+    )
+    resp.raise_for_status()
+
+
+def salvar_ocorrencia_dashboard(r):
+    """Grava UMA ocorrência vinda do Dashboard do Município, e só os campos que
+    o Dashboard controla.
+
+    Bug achado em 27/09: o Dashboard usava `salvar_registros(registros)`, que
+    regrava a lista INTEIRA de ocorrências do fluxo normal a partir do que foi
+    carregado. Como `_do_banco()` não traz `participante_id` nem
+    `antena_numero`, cada clique em Atualizar / Enviar resposta / Arquivar /
+    Restaurar gravava `participante_id = null` em TODAS as ocorrências normais
+    — e o Meu Painel do cidadão zerava (ocorrência 76, protocolo 4790bd95).
+    A mesma regravação ainda podia devolver um hash da blockchain antigo (vazio)
+    por cima de um que o worker acabou de gravar, fazendo o worker reenviar a
+    transação.
+
+    Aqui é o contrário: PATCH só na linha desta ocorrência (pelo protocolo) e
+    só nestes campos. Nunca encosta em participante_id, antena_numero, hashes,
+    cp_ganho, tentativas ou erro — esses são do app, do worker ou do banco.
+    """
+    corpo = {
+        "status": _STATUS_PARA_BANCO.get(r.get("status", "recebida"), "registrado"),
+        "setor": r.get("setor", SETORES[0]),
+        "prazo_dias": int(r.get("prazo_dias") or PRAZO_PADRAO_DIAS),
+        "mensagens": r.get("mensagens", []),
+        "arquivada": bool(r.get("arquivada", False)),
+        "em_andamento_em": _carimbo_para_iso(r.get("data_andamento")),
+        "concluido_em": _carimbo_para_iso(r.get("data_conclusao")),
+    }
+    resp = requests.patch(
+        _REST,
+        headers=_HEADERS,
+        params={"protocolo": f"eq.{r.get('id')}"},
         json=corpo,
         timeout=_TIMEOUT,
     )

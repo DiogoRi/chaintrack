@@ -31,7 +31,7 @@ from ocorrencias import (                     # noqa: E402
     formatar_data,
     info_prazo,
     protocolo_de,
-    salvar_registros,
+    atualizar_registro,
     texto_prazo,
 )
 from tema_visual import aplicar_tema          # noqa: E402
@@ -206,7 +206,9 @@ if encontrada:
     if enviada:
         if texto.strip():
             adicionar_mensagem(r, texto, autor="cidadao")
-            salvar_registros(registros)
+            # Grava só as mensagens desta ocorrência. Antes regravava a lista
+            # inteira e apagava participante_id de todas (bug de 27/09).
+            atualizar_registro(r["id"], mensagens=r.get("mensagens", []))
             st.success(
                 "Mensagem enviada. Ela aparece para a equipe responsável junto "
                 "com a sua ocorrência."
